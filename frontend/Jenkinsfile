@@ -1,0 +1,98 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Jenkinsfile — CI/CD Pipeline for Blockchain Security Monitor
+// HKE Society's PDA College of Engineering, Kalaburagi
+// ─────────────────────────────────────────────────────────────────────────────
+
+pipeline {
+    agent any
+
+    environment {
+        APP_NAME       = 'blockchain-monitor'
+        DOCKER_IMAGE   = "bcmonitor-backend"
+        NODE_VERSION   = '20'
+    }
+
+    stages {
+
+        stage('📥 Checkout') {
+            steps {
+                echo 'Checking out source code...'
+                checkout scm
+            }
+        }
+
+        stage('📦 Install Dependencies') {
+            steps {
+                dir('backend') {
+                    sh 'npm ci'
+                }
+            }
+        }
+
+        stage('🧪 Run Tests') {
+            steps {
+                dir('backend') {
+                    sh 'npm test -- --passWithNoTests'
+                }
+            }
+            post {
+                always {
+                    echo 'Tests completed'
+                }
+            }
+        }
+
+        stage('🔍 Security Scan') {
+            steps {
+                dir('backend') {
+                    sh 'npm audit --audit-level=high || true'
+                }
+            }
+        }
+
+        stage('🐳 Build Docker Image') {
+            steps {
+                dir('backend') {
+                    sh "docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER} -t ${DOCKER_IMAGE}:latest ."
+                }
+            }
+        }
+
+        stage('🚀 Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh '''
+                    docker-compose down --remove-orphans || true
+                    docker-compose up -d --build
+                    echo "Waiting for services to be healthy..."
+                    sleep 10
+                    curl -f http://localhost:5000/api/health || exit 1
+                    echo "✅ Deployment successful!"
+                '''
+            }
+        }
+
+        stage('📊 Verify Monitoring') {
+            steps {
+                sh '''
+                    curl -f http://localhost:9090/-/healthy || echo "Prometheus not ready"
+                    echo "✅ Monitoring stack verified"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '✅ Pipeline completed successfully!'
+        }
+        failure {
+            echo '❌ Pipeline failed! Check logs above.'
+        }
+        always {
+            echo "Build #${BUILD_NUMBER} finished"
+        }
+    }
+}

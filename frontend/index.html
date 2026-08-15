@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BlockChain Security Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060b14;
+  --bg2: #0d1525;
+  --bg3: #111c2e;
+  --card: #0f1a2e;
+  --border: #1e3050;
+  --border2: #243a5e;
+  --primary: #00d4ff;
+  --primary-dim: #0099bb;
+  --accent: #7c3aed;
+  --accent2: #a855f7;
+  --green: #10b981;
+  --green-dim: #065f46;
+  --red: #ef4444;
+  --red-dim: #7f1d1d;
+  --yellow: #f59e0b;
+  --yellow-dim: #78350f;
+  --text: #e2e8f0;
+  --text2: #94a3b8;
+  --text3: #64748b;
+  --font: 'Space Grotesk', sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:var(--bg2); }
+::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+
+/* ── Grid bg ── */
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 40px 40px; opacity:0.15;
+}
+
+/* ─────────────────────── LOGIN PAGE ─────────────────────── */
+#login-page {
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:100;
+  background:radial-gradient(ellipse at center, #0d1f3c 0%, #060b14 70%);
+}
+.login-box {
+  background:var(--card); border:1px solid var(--border2); border-radius:20px; padding:48px 40px;
+  width:420px; max-width:95vw; position:relative; overflow:hidden;
+  box-shadow: 0 0 80px rgba(0,212,255,0.08), 0 25px 50px rgba(0,0,0,0.5);
+  animation: fadeSlideUp 0.6s ease;
+}
+.login-box::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg, transparent, var(--primary), var(--accent2), transparent);
+}
+.login-logo { text-align:center; margin-bottom:32px; }
+.login-logo .icon { font-size:48px; display:block; margin-bottom:8px; }
+.login-logo h1 { font-size:22px; font-weight:700; color:var(--primary); letter-spacing:-0.5px; }
+.login-logo p { font-size:12px; color:var(--text3); margin-top:4px; font-family:var(--mono); }
+.login-tabs { display:flex; background:var(--bg2); border-radius:10px; padding:4px; margin-bottom:28px; gap:4px; }
+.tab-btn { flex:1; padding:10px; border:none; background:transparent; color:var(--text2); font-family:var(--font); font-size:14px; font-weight:500; border-radius:7px; cursor:pointer; transition:all 0.2s; }
+.tab-btn.active { background:var(--primary); color:#000; font-weight:600; }
+.form-group { margin-bottom:18px; }
+.form-group label { display:block; font-size:12px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); }
+.form-group input {
+  width:100%; padding:12px 16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px;
+  color:var(--text); font-family:var(--font); font-size:14px; outline:none; transition:border-color 0.2s;
+}
+.form-group input:focus { border-color:var(--primary); }
+.btn-login {
+  width:100%; padding:14px; background:linear-gradient(135deg, var(--primary), var(--primary-dim)); border:none; border-radius:10px;
+  color:#000; font-family:var(--font); font-size:15px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-top:8px;
+  letter-spacing:0.3px;
+}
+.btn-login:hover { transform:translateY(-1px); box-shadow:0 8px 25px rgba(0,212,255,0.3); }
+.btn-login:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+.login-hint { margin-top:20px; padding:12px; background:var(--bg2); border-radius:8px; font-size:12px; font-family:var(--mono); color:var(--text3); }
+.login-hint strong { color:var(--text2); }
+.error-msg { color:var(--red); font-size:13px; margin-top:10px; text-align:center; padding:8px; background:rgba(239,68,68,0.1); border-radius:8px; display:none; }
+
+/* ─────────────────────── MAIN LAYOUT ─────────────────────── */
+#app { display:none; min-height:100vh; position:relative; z-index:1; }
+
+/* Sidebar */
+.sidebar {
+  position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--bg2);
+  border-right:1px solid var(--border); display:flex; flex-direction:column; z-index:50;
+  transition:transform 0.3s;
+}
+.sidebar-logo { padding:24px 20px 16px; border-bottom:1px solid var(--border); }
+.sidebar-logo h2 { font-size:15px; font-weight:700; color:var(--primary); }
+.sidebar-logo span { font-size:11px; color:var(--text3); font-family:var(--mono); }
+.sidebar-user { padding:14px 20px; border-bottom:1px solid var(--border); }
+.user-avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg, var(--primary), var(--accent2)); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#000; margin-bottom:8px; }
+.user-name { font-size:13px; font-weight:600; }
+.user-role { font-size:11px; color:var(--text3); font-family:var(--mono); margin-top:2px; }
+.sidebar-nav { flex:1; padding:12px 0; overflow-y:auto; }
+.nav-section { padding:8px 20px 4px; font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:1.5px; font-family:var(--mono); }
+.nav-item {
+  display:flex; align-items:center; gap:10px; padding:10px 20px; cursor:pointer;
+  color:var(--text2); font-size:13px; font-weight:500; transition:all 0.15s;
+  border-left:3px solid transparent; margin:1px 0;
+}
+.nav-item:hover { color:var(--text); background:rgba(255,255,255,0.04); }
+.nav-item.active { color:var(--primary); background:rgba(0,212,255,0.07); border-left-color:var(--primary); }
+.nav-item .ico { font-size:16px; width:20px; text-align:center; }
+.nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; padding:2px 7px; border-radius:10px; font-family:var(--mono); }
+.sidebar-footer { padding:16px 20px; border-top:1px solid var(--border); }
+.btn-logout { width:100%; padding:10px; background:transparent; border:1px solid var(--border); border-radius:8px; color:var(--text2); cursor:pointer; font-family:var(--font); font-size:13px; transition:all 0.2s; }
+.btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+/* Main content */
+.main { margin-left:240px; padding:28px; min-height:100vh; }
+.page { display:none; animation:fadeSlideUp 0.4s ease; }
+.page.active { display:block; }
+
+/* Page header */
+.page-header { margin-bottom:28px; }
+.page-header h1 { font-size:24px; font-weight:700; }
+.page-header p { color:var(--text2); font-size:14px; margin-top:4px; }
+
+/* Stats grid */
+.stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:28px; }
+.stat-card {
+  background:var(--card); border:1px solid var(--border); border-radius:14px; padding:20px;
+  position:relative; overflow:hidden; transition:border-color 0.2s;
+}
+.stat-card:hover { border-color:var(--border2); }
+.stat-card .label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); }
+.stat-card .value { font-size:30px; font-weight:700; margin:8px 0 4px; font-family:var(--mono); }
+.stat-card .change { font-size:12px; color:var(--text3); }
+.stat-card .ico { position:absolute; top:16px; right:16px; font-size:28px; opacity:0.25; }
+.stat-card.green .value { color:var(--green); }
+.stat-card.red .value { color:var(--red); }
+.stat-card.blue .value { color:var(--primary); }
+.stat-card.purple .value { color:var(--accent2); }
+.stat-card.yellow .value { color:var(--yellow); }
+
+/* Cards */
+.card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:24px; margin-bottom:20px; }
+.card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.card-header h3 { font-size:15px; font-weight:600; }
+.card-header .sub { font-size:12px; color:var(--text3); }
+
+/* Tables */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; }
+th { padding:10px 14px; text-align:left; font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); border-bottom:1px solid var(--border); white-space:nowrap; }
+td { padding:12px 14px; font-size:13px; border-bottom:1px solid rgba(30,48,80,0.5); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:rgba(255,255,255,0.02); }
+.mono { font-family:var(--mono); font-size:11px; color:var(--text3); }
+.truncate { max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Badges */
+.badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; font-family:var(--mono); }
+.badge.confirmed { background:rgba(16,185,129,0.12); color:var(--green); border:1px solid rgba(16,185,129,0.2); }
+.badge.flagged { background:rgba(239,68,68,0.12); color:var(--red); border:1px solid rgba(239,68,68,0.2); }
+.badge.pending { background:rgba(245,158,11,0.12); color:var(--yellow); border:1px solid rgba(245,158,11,0.2); }
+.badge.active { background:rgba(16,185,129,0.12); color:var(--green); border:1px solid rgba(16,185,129,0.2); }
+.badge.suspended { background:rgba(239,68,68,0.12); color:var(--red); border:1px solid rgba(239,68,68,0.2); }
+.badge.admin { background:rgba(124,58,237,0.15); color:var(--accent2); border:1px solid rgba(124,58,237,0.3); }
+.badge.user { background:rgba(0,212,255,0.1); color:var(--primary); border:1px solid rgba(0,212,255,0.2); }
+.badge.critical { background:rgba(239,68,68,0.15); color:var(--red); }
+.badge.high { background:rgba(245,158,11,0.12); color:var(--yellow); }
+.badge.medium { background:rgba(0,212,255,0.1); color:var(--primary); }
+.badge.low { background:rgba(100,116,139,0.1); color:var(--text3); }
+
+/* Buttons */
+.btn { padding:8px 16px; border-radius:8px; font-family:var(--font); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; border:none; display:inline-flex; align-items:center; gap:6px; }
+.btn-primary { background:var(--primary); color:#000; font-weight:600; }
+.btn-primary:hover { background:#00b8d9; }
+.btn-danger { background:rgba(239,68,68,0.15); color:var(--red); border:1px solid rgba(239,68,68,0.25); }
+.btn-danger:hover { background:rgba(239,68,68,0.25); }
+.btn-ghost { background:transparent; border:1px solid var(--border); color:var(--text2); }
+.btn-ghost:hover { border-color:var(--border2); color:var(--text); }
+.btn-success { background:rgba(16,185,129,0.15); color:var(--green); border:1px solid rgba(16,185,129,0.25); }
+.btn-success:hover { background:rgba(16,185,129,0.25); }
+
+/* Forms */
+.form-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:16px; }
+.field label { display:block; font-size:11px; color:var(--text3); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); }
+.field input, .field select, .field textarea {
+  width:100%; padding:10px 14px; background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+  color:var(--text); font-family:var(--font); font-size:13px; outline:none; transition:border-color 0.2s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color:var(--primary); }
+.field select option { background:var(--bg2); }
+.field textarea { min-height:80px; resize:vertical; }
+
+/* Alert cards */
+.alert-card { border-radius:10px; padding:16px; margin-bottom:12px; border:1px solid; display:flex; gap:14px; align-items:flex-start; }
+.alert-card.critical { background:rgba(239,68,68,0.06); border-color:rgba(239,68,68,0.2); }
+.alert-card.high { background:rgba(245,158,11,0.06); border-color:rgba(245,158,11,0.2); }
+.alert-card .alert-ico { font-size:20px; padding-top:2px; }
+.alert-card .alert-msg { flex:1; }
+.alert-card .alert-title { font-size:13px; font-weight:600; margin-bottom:4px; }
+.alert-card .alert-meta { font-size:11px; color:var(--text3); font-family:var(--mono); }
+
+/* Score bar */
+.score-bar { width:60px; height:6px; background:var(--bg3); border-radius:3px; overflow:hidden; display:inline-block; vertical-align:middle; }
+.score-fill { height:100%; border-radius:3px; transition:width 0.4s; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--card); border:1px solid var(--border2); border-radius:16px; padding:32px; width:500px; max-width:95vw; max-height:90vh; overflow-y:auto; position:relative; animation:fadeSlideUp 0.3s ease; }
+.modal h2 { font-size:18px; margin-bottom:20px; }
+.modal-close { position:absolute; top:16px; right:16px; background:none; border:none; color:var(--text3); font-size:20px; cursor:pointer; padding:4px; }
+
+/* Transfer page specific */
+.wallet-display { font-family:var(--mono); font-size:11px; color:var(--text3); background:var(--bg2); padding:8px 12px; border-radius:6px; word-break:break-all; margin-top:4px; }
+.balance-big { font-size:42px; font-weight:700; color:var(--primary); font-family:var(--mono); }
+.balance-label { font-size:12px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); margin-bottom:4px; }
+
+/* Chart bars */
+.chart-bars { display:flex; align-items:flex-end; gap:8px; height:120px; padding-top:10px; }
+.chart-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.chart-bar { width:100%; border-radius:4px 4px 0 0; transition:height 0.6s ease; min-height:2px; }
+.chart-bar.normal { background:linear-gradient(180deg, var(--primary), var(--primary-dim)); }
+.chart-bar.suspicious { background:linear-gradient(180deg, var(--red), #b91c1c); }
+.chart-label { font-size:9px; color:var(--text3); font-family:var(--mono); text-align:center; }
+
+/* Profile info grid */
+.info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; }
+.info-item .info-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); margin-bottom:4px; }
+.info-item .info-value { font-size:14px; font-weight:500; }
+
+/* Suspicion score */
+.suspicion-score { display:flex; align-items:center; gap:8px; }
+
+/* Pagination */
+.pagination { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:16px; }
+.page-btn { padding:6px 12px; border:1px solid var(--border); background:transparent; color:var(--text2); border-radius:6px; cursor:pointer; font-family:var(--font); font-size:13px; }
+.page-btn:hover { border-color:var(--border2); color:var(--text); }
+.page-btn.active { background:var(--primary); border-color:var(--primary); color:#000; font-weight:600; }
+.page-info { font-size:12px; color:var(--text3); font-family:var(--mono); }
+
+/* Toast */
+.toast-container { position:fixed; bottom:24px; right:24px; z-index:999; display:flex; flex-direction:column; gap:8px; }
+.toast { padding:12px 18px; border-radius:10px; font-size:13px; font-weight:500; animation:slideInRight 0.3s ease; box-shadow:0 8px 25px rgba(0,0,0,0.4); border:1px solid; max-width:360px; }
+.toast.success { background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.3); color:var(--green); }
+.toast.error { background:rgba(239,68,68,0.15); border-color:rgba(239,68,68,0.3); color:var(--red); }
+.toast.warning { background:rgba(245,158,11,0.15); border-color:rgba(245,158,11,0.3); color:var(--yellow); }
+
+/* Loading */
+.loading { display:flex; align-items:center; justify-content:center; padding:40px; color:var(--text3); gap:10px; }
+.spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--primary); border-radius:50%; animation:spin 0.7s linear infinite; }
+
+/* Devops info bar */
+.devops-bar { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.devops-pill { display:flex; align-items:center; gap:6px; padding:6px 14px; background:var(--card); border:1px solid var(--border); border-radius:20px; font-size:11px; font-family:var(--mono); color:var(--text3); }
+.devops-pill .dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
+.devops-pill .dot.red { background:var(--red); }
+.devops-pill .dot.yellow { background:var(--yellow); }
+
+@keyframes fadeSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes slideInRight { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+.empty-state { text-align:center; padding:40px; color:var(--text3); }
+.empty-state .ico { font-size:40px; margin-bottom:12px; opacity:0.4; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media(max-width:900px) { .grid-2 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ LOGIN PAGE ═══════════════════ -->
+<div id="login-page">
+<div class="login-box">
+  <div class="login-logo">
+    <span class="icon">🔐</span>
+    <h1>BlockChain Security Monitor</h1>
+    <p>HKE Society's PDA College of Engineering</p>
+  </div>
+  <div class="login-tabs">
+    <button class="tab-btn active" onclick="setLoginTab('user')">👤 User Portal</button>
+    <button class="tab-btn" onclick="setLoginTab('admin')">🛡️ Admin Portal</button>
+  </div>
+  <div class="form-group">
+    <label>Username or Email</label>
+    <input type="text" id="login-username" placeholder="Enter username" autocomplete="username">
+  </div>
+  <div class="form-group">
+    <label>Password</label>
+    <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password" onkeypress="if(event.key==='Enter')doLogin()">
+  </div>
+  <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
+  <div class="error-msg" id="login-error"></div>
+  <div class="login-hint">
+    
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════ MAIN APP ═══════════════════ -->
+<div id="app">
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <h2>🔐 BCMonitor</h2>
+    <span id="sb-version">v1.0.0 · DevOps Build</span>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sb-avatar">?</div>
+    <div class="user-name" id="sb-name">Loading...</div>
+    <div class="user-role" id="sb-role">--</div>
+  </div>
+  <nav class="sidebar-nav" id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <button class="btn-logout" onclick="doLogout()">⬡ Sign Out</button>
+  </div>
+</aside>
+
+<main class="main">
+  <!-- ── USER PAGES ── -->
+  <div class="page" id="page-dashboard">
+    <div class="page-header">
+      <h1>My Dashboard</h1>
+      <p>Welcome back, <span id="dash-name">--</span></p>
+    </div>
+    <div class="devops-bar">
+      <div class="devops-pill"><div class="dot"></div>CI/CD Pipeline: Active</div>
+      <div class="devops-pill"><div class="dot"></div>Blockchain Node: Synced</div>
+      <div class="devops-pill"><div class="dot yellow"></div>Monitoring: Running</div>
+    </div>
+    <div class="stats-grid" id="user-stats"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Recent Transactions</h3><span class="sub" onclick="showPage('page-history')" style="cursor:pointer;color:var(--primary)">View all →</span></div>
+        <div id="user-recent-tx"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Account Info</h3></div>
+        <div id="user-account-info"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-profile">
+    <div class="page-header"><h1>My Profile</h1><p>View and update your account information</p></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Personal Information</h3><button class="btn btn-ghost" onclick="toggleEditProfile()">✏️ Edit</button></div>
+        <div id="profile-view"></div>
+        <div id="profile-edit" style="display:none">
+          <div class="form-row">
+            <div class="field"><label>Full Name</label><input id="edit-fullname" type="text"></div>
+            <div class="field"><label>Phone</label><input id="edit-phone" type="text"></div>
+          </div>
+          <div class="form-row"><div class="field"><label>Department</label><input id="edit-dept" type="text"></div></div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+          <button class="btn btn-ghost" style="margin-left:8px" onclick="toggleEditProfile()">Cancel</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Change Password</h3></div>
+        <div class="field" style="margin-bottom:12px"><label>Current Password</label><input type="password" id="cur-pass" placeholder="Current password"></div>
+        <div class="field" style="margin-bottom:12px"><label>New Password</label><input type="password" id="new-pass" placeholder="New password (min 6 chars)"></div>
+        <div class="field" style="margin-bottom:16px"><label>Confirm New Password</label><input type="password" id="conf-pass" placeholder="Confirm new password"></div>
+        <button class="btn btn-primary" onclick="changePassword()">Update Password</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-transfer">
+    <div class="page-header"><h1>Transfer Funds</h1><p>Send blockchain tokens to another user</p></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="balance-label">Available Balance</div>
+        <div class="balance-big" id="transfer-balance">₹0.00</div>
+        <div style="margin-top:20px;margin-bottom:20px;height:1px;background:var(--border)"></div>
+        <div class="form-row">
+          <div class="field">
+            <label>Recipient Username / Wallet</label>
+            <input id="tx-to" type="text" placeholder="e.g. rajesh or 0x..." oninput="searchRecipient(this.value)">
+            <div id="recipient-suggestions" style="position:relative"></div>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Amount (₹)</label>
+            <input id="tx-amount" type="number" placeholder="0.00" min="0.01" step="0.01">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label>Note (optional)</label>
+            <textarea id="tx-note" placeholder="Payment for..."></textarea>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doTransfer()" style="width:100%;padding:12px;font-size:15px">⟶ Send Transfer</button>
+        <p style="font-size:11px;color:var(--text3);margin-top:10px;text-align:center;font-family:var(--mono)">Fee: 0.1% · Analyzed for suspicious activity</p>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Transaction will be analyzed by AI</h3></div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.8">
+          Every transaction passes through our anomaly detection engine which checks:<br><br>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--primary)">◆</span> Amount vs your 30-day average</div>
+            <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--primary)">◆</span> Transaction time (unusual hours)</div>
+            <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--primary)">◆</span> Velocity (frequency in 1 hour)</div>
+            <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--primary)">◆</span> New recipient detection</div>
+            <div style="display:flex;gap:8px;align-items:center"><span style="color:var(--primary)">◆</span> Round-number structuring</div>
+          </div>
+          <br>Flagged transactions are reported to admin immediately.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-history">
+    <div class="page-header"><h1>Transaction History</h1><p>All your blockchain transactions</p></div>
+    <div class="card">
+      <div class="card-header"><h3>My Transactions</h3><span class="sub" id="tx-count">--</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tx Hash</th><th>Type</th><th>Party</th><th>Amount</th><th>Fee</th><th>Status</th><th>Risk</th><th>Date</th></tr></thead>
+          <tbody id="history-tbody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="history-pagination"></div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN PAGES ── -->
+  <div class="page" id="page-admin-overview">
+    <div class="page-header"><h1>Admin Overview</h1><p>System-wide blockchain monitoring dashboard</p></div>
+    <div class="devops-bar">
+      <div class="devops-pill"><div class="dot"></div>CI/CD: Jenkins Active</div>
+      <div class="devops-pill"><div class="dot"></div>Docker: 3 containers</div>
+      <div class="devops-pill"><div class="dot"></div>Prometheus: Scraping</div>
+      <div class="devops-pill"><div class="dot yellow"></div>Alerts: <span id="devops-alert-count">--</span> unresolved</div>
+    </div>
+    <div class="stats-grid" id="admin-stats"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Transaction Volume (7 days)</h3></div>
+        <div class="chart-bars" id="admin-chart"></div>
+        <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;font-family:var(--mono)">
+          <span><span style="color:var(--primary)">■</span> Normal</span>
+          <span><span style="color:var(--red)">■</span> Suspicious</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>⚠️ Active Alerts</h3><button class="btn btn-ghost" style="font-size:12px" onclick="showPage('page-admin-alerts')">View all →</button></div>
+        <div id="admin-alert-preview"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Recent Transactions (All Users)</h3></div>
+      <div id="admin-recent-tx"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-transactions">
+    <div class="page-header"><h1>All Transactions</h1><p>Monitor every blockchain transaction across all users</p></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Transactions</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px">
+            <option value="">All</option><option value="true">Suspicious only</option>
+          </select>
+          <button class="btn btn-primary" onclick="openAdminTransferModal()" style="font-size:12px;padding:6px 12px">+ Transfer</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tx Hash</th><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Risk Score</th><th>Reasons</th><th>Date</th></tr></thead>
+          <tbody id="admin-tx-tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="admin-tx-pagination"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-alerts">
+    <div class="page-header"><h1>Security Alerts</h1><p>Suspicious activity detected by the anomaly engine</p></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Alerts</h3>
+        <div style="display:flex;gap:8px">
+          <select id="alert-filter" onchange="loadAlerts()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px">
+            <option value="false">Unresolved</option><option value="true">Resolved</option><option value="">All</option>
+          </select>
+        </div>
+      </div>
+      <div id="alerts-list"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-admin-users">
+    <div class="page-header"><h1>User Management</h1><p>All registered users and their blockchain accounts</p></div>
+    <div class="card">
+      <div class="card-header">
+        <h3>Users</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="user-search" type="text" placeholder="Search..." oninput="loadAdminUsers()" style="padding:7px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:13px;width:180px">
+          <button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>User</th><th>Email</th><th>Wallet</th><th>Balance</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+          <tbody id="admin-users-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CI/CD PIPELINE MONITORING ── -->
+  <div class="page" id="page-admin-cicd">
+    <div class="page-header"><h1>CI/CD Pipeline Monitoring</h1><p>Continuous integration and deployment pipeline status</p></div>
+    <div class="devops-bar">
+      <div class="devops-pill"><div class="dot"></div>Jenkins: Running</div>
+      <div class="devops-pill"><div class="dot"></div>GitHub Actions: Active</div>
+      <div class="devops-pill"><div class="dot"></div>Docker: Building</div>
+      <div class="devops-pill"><div class="dot yellow"></div>Tests: 2 failing</div>
+    </div>
+    <div class="stats-grid" id="cicd-stats"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>Pipeline Status</h3></div>
+        <div id="pipeline-status"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Recent Builds</h3></div>
+        <div id="recent-builds"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h3>Deployment History</h3></div>
+      <div id="deployment-history"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- ═══════════════════ MODALS ═══════════════════ -->
+<div class="modal-overlay" id="modal-add-user">
+<div class="modal">
+  <button class="modal-close" onclick="closeModal('modal-add-user')">✕</button>
+  <h2>Add New User</h2>
+  <div class="form-row">
+    <div class="field"><label>Full Name *</label><input id="nu-fullname" type="text" placeholder="Full Name"></div>
+    <div class="field"><label>Username *</label><input id="nu-username" type="text" placeholder="username"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Email *</label><input id="nu-email" type="email" placeholder="user@example.com"></div>
+    <div class="field"><label>Password *</label><input id="nu-password" type="password" placeholder="min 6 chars"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Phone</label><input id="nu-phone" type="text" placeholder="+91-..."></div>
+    <div class="field"><label>Department</label><input id="nu-dept" type="text" placeholder="Engineering"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Role</label>
+      <select id="nu-role"><option value="user">User</option><option value="admin">Admin</option></select>
+    </div>
+    <div class="field"><label>Initial Balance (₹)</label><input id="nu-balance" type="number" placeholder="0" min="0"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px">
+    <button class="btn btn-primary" onclick="submitAddUser()">Create User</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-add-user')">Cancel</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-edit-user">
+<div class="modal">
+  <button class="modal-close" onclick="closeModal('modal-edit-user')">✕</button>
+  <h2>Edit User</h2>
+  <input type="hidden" id="eu-id">
+  <div class="form-row">
+    <div class="field"><label>Full Name</label><input id="eu-fullname" type="text"></div>
+    <div class="field"><label>Email</label><input id="eu-email" type="email"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Phone</label><input id="eu-phone" type="text"></div>
+    <div class="field"><label>Department</label><input id="eu-dept" type="text"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Status</label>
+      <select id="eu-status"><option value="active">Active</option><option value="suspended">Suspended</option></select>
+    </div>
+    <div class="field"><label>Role</label>
+      <select id="eu-role"><option value="user">User</option><option value="admin">Admin</option></select>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>Balance (₹)</label><input id="eu-balance" type="number" step="0.01"></div>
+    <div class="field"><label>New Password (leave blank to keep)</label><input id="eu-password" type="password" placeholder="New password"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px">
+    <button class="btn btn-primary" onclick="submitEditUser()">Save Changes</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-edit-user')">Cancel</button>
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-admin-transfer">
+<div class="modal">
+  <button class="modal-close" onclick="closeModal('modal-admin-transfer')">✕</button>
+  <h2>Admin Transfer</h2>
+  <p style="font-size:12px;color:var(--text3);margin-bottom:16px">Send funds between user accounts for administrative purposes.</p>
+  <div class="form-row">
+    <div class="field">
+      <label>From Username</label>
+      <input id="at-from" type="text" placeholder="Sender username" oninput="searchAdminRecipient('from', this.value)">
+      <div id="from-suggestions" style="position:relative"></div>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field">
+      <label>To Username</label>
+      <input id="at-to" type="text" placeholder="Recipient username" oninput="searchAdminRecipient('to', this.value)">
+      <div id="to-suggestions" style="position:relative"></div>
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field">
+      <label>Amount (₹)</label>
+      <input id="at-amount" type="number" placeholder="0.00" min="0.01" step="0.01">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field">
+      <label>Note</label>
+      <textarea id="at-note" placeholder="Reason for transfer..."></textarea>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px">
+    <button class="btn btn-primary" onclick="submitAdminTransfer()">Execute Transfer</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-admin-transfer')">Cancel</button>
+  </div>
+</div>
+</div>
+
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG — Backend API URL (injected by frontend server)
+// ═══════════════════════════════════════════════════════════
+const API_BASE = '__BACKEND_URL__';
+
+let currentUser = null;
+let authToken = null;
+let currentLoginTab = 'user';
+
+// ─── DEMO MODE: If backend not running, use mock data ─────
+const DEMO_MODE = false; // Set to false when backend is running
+
+// ─────────────────── AUTH ─────────────────────────────────
+function setLoginTab(tab) {
+  currentLoginTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='user')||(i===1&&tab==='admin')));
+  document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : 'junaid, rajesh, or sharanagouda';
+}
+
+async function doLogin() {
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('login-btn');
+
+  if (!username || !password) { showLoginError('Please enter username and password'); return; }
+
+  btn.disabled = true; btn.textContent = 'Signing in...';
+  errEl.style.display = 'none';
+
+  if (DEMO_MODE) {
+    // Mock login without backend
+    const MOCK_USERS = {
+      'admin': { id:'admin-001', username:'admin', email:'admin@blockchainmonitor.com', fullName:'System Administrator', role:'admin', walletAddress:'0xADMIN000000000000000000000000000000000001', balance:999999, status:'active', phone:'+91-9876543210', department:'IT Security', createdAt:'2024-01-01T00:00:00.000Z', lastLogin: new Date().toISOString() },
+      'junaid': { id:'user-001', username:'junaid', email:'junaid@example.com', fullName:'MD Junaid', role:'user', walletAddress:'0x1234567890abcdef1234567890abcdef12345678', balance:5000, status:'active', phone:'+91-9988776655', department:'Engineering', createdAt:'2024-01-15T10:00:00.000Z', lastLogin: new Date().toISOString() },
+      'rajesh': { id:'user-002', username:'rajesh', email:'rajesh@example.com', fullName:'Rajesh Padashetty', role:'user', walletAddress:'0xabcdef1234567890abcdef1234567890abcdef12', balance:7500.50, status:'active', phone:'+91-9876543211', department:'Finance', createdAt:'2024-01-16T11:00:00.000Z', lastLogin: new Date().toISOString() },
+      'sharanagouda': { id:'user-003', username:'sharanagouda', email:'sharanagouda@example.com', fullName:'Sharanagouda', role:'user', walletAddress:'0x9876543210fedcba9876543210fedcba98765432', balance:3200.75, status:'active', phone:'+91-9765432100', department:'Operations', createdAt:'2024-01-17T09:00:00.000Z', lastLogin: new Date().toISOString() }
+    };
+    await sleep(800);
+    const user = MOCK_USERS[username];
+    if (!user || password !== 'password') {
+      btn.disabled = false; btn.textContent = 'Sign In';
+      showLoginError('Invalid credentials. Try admin/password or junaid/password'); return;
+    }
+    if (currentLoginTab === 'admin' && user.role !== 'admin') {
+      btn.disabled = false; btn.textContent = 'Sign In';
+      showLoginError('This account does not have admin privileges'); return;
+    }
+    if (currentLoginTab === 'user' && user.role === 'admin') {
+      btn.disabled = false; btn.textContent = 'Sign In';
+      showLoginError('Admins must use the Admin Portal tab'); return;
+    }
+    authToken = 'demo-token';
+    currentUser = user;
+    initApp();
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+    if (!res.ok) { showLoginError(data.error || 'Login failed'); return; }
+    if (currentLoginTab === 'admin' && data.user.role !== 'admin') { showLoginError('Not an admin account. Use User Portal.'); return; }
+    if (currentLoginTab === 'user' && data.user.role === 'admin') { showLoginError('Admins must use the Admin Portal tab.'); return; }
+    authToken = data.token;
+    currentUser = data.user;
+    initApp();
+  } catch(e) {
+    console.error('Login network error:', e);
+    showLoginError(`Cannot connect to server. ${e.message || 'Please check server and CORS settings.'}`);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+function showLoginError(msg) {
+  const el = document.getElementById('login-error');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('login-btn').disabled = false;
+  document.getElementById('login-btn').textContent = 'Sign In';
+}
+
+function doLogout() {
+  authToken = null; currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// ─────────────────── APP INIT ─────────────────────────────
+function initApp() {
+  document.getElementById('login-page').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+
+  // Sidebar user
+  document.getElementById('sb-avatar').textContent = currentUser.fullName[0].toUpperCase();
+  document.getElementById('sb-name').textContent = currentUser.fullName;
+  document.getElementById('sb-role').textContent = currentUser.role.toUpperCase() + ' · ' + (currentUser.department || 'N/A');
+  document.getElementById('dash-name').textContent = currentUser.fullName.split(' ')[0];
+
+  buildSidebar();
+  if (currentUser.role === 'admin') {
+    showPage('page-admin-overview');
+  } else {
+    showPage('page-dashboard');
+  }
+}
+
+function buildSidebar() {
+  const isAdmin = currentUser.role === 'admin';
+  const nav = document.getElementById('sidebar-nav');
+
+  const userNav = `
+    <div class="nav-section">User</div>
+    <div class="nav-item" onclick="showPage('page-dashboard')"><span class="ico">⊞</span> Dashboard</div>
+    <div class="nav-item" onclick="showPage('page-profile')"><span class="ico">◎</span> My Profile</div>
+    <div class="nav-item" onclick="showPage('page-transfer')"><span class="ico">⇄</span> Transfer Funds</div>
+    <div class="nav-item" onclick="showPage('page-history')"><span class="ico">◈</span> Transaction History</div>
+  `;
+  const adminNav = `
+    <div class="nav-section">Admin</div>
+    <div class="nav-item" onclick="showPage('page-admin-overview')"><span class="ico">⊞</span> Overview</div>
+    <div class="nav-item" onclick="showPage('page-admin-transactions')"><span class="ico">◈</span> All Transactions</div>
+    <div class="nav-item" onclick="showPage('page-admin-alerts')"><span class="ico">⚠</span> Security Alerts <span class="nav-badge" id="alert-badge">!</span></div>
+    <div class="nav-item" onclick="showPage('page-admin-users')"><span class="ico">◎</span> User Management</div>
+    <div class="nav-item" onclick="showPage('page-admin-cicd')"><span class="ico">⚙</span> CI/CD Pipeline</div>
+  `;
+
+  nav.innerHTML = isAdmin ? adminNav : userNav;
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+
+  // Highlight nav
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(id)) n.classList.add('active');
+  });
+
+  // Load page data
+  const loaders = {
+    'page-dashboard': loadUserDashboard,
+    'page-profile': loadProfile,
+    'page-transfer': loadTransferPage,
+    'page-history': () => loadHistory(1),
+    'page-admin-overview': loadAdminOverview,
+    'page-admin-transactions': loadAllTx,
+    'page-admin-alerts': loadAlerts,
+    'page-admin-users': loadAdminUsers,
+    'page-admin-cicd': loadAdminCICD
+  };
+  if (loaders[id]) loaders[id]();
+}
+
+// ─────────────────── USER DASHBOARD ───────────────────────
+async function loadUserDashboard() {
+  let txs = [];
+  if (DEMO_MODE) {
+    txs = await getMockUserTx();
+  } else {
+    const res = await apiFetch('/transactions/my');
+    if (!res) return;
+    txs = res.transactions || [];
+  }
+  const myTxs = txs.filter(tx => tx.fromUserId === currentUser.id || tx.toUserId === currentUser.id);
+  const totalSent = myTxs.filter(t => t.fromUserId === currentUser.id).reduce((s, t) => s + t.amount, 0);
+  const totalRecv = myTxs.filter(t => t.toUserId === currentUser.id).reduce((s, t) => s + t.amount, 0);
+
+  document.getElementById('user-stats').innerHTML = `
+    <div class="stat-card blue"><div class="ico">₹</div><div class="label">Balance</div><div class="value">₹${fmt(currentUser.balance)}</div><div class="change">Blockchain wallet</div></div>
+    <div class="stat-card green"><div class="ico">↓</div><div class="label">Total Received</div><div class="value">₹${fmt(totalRecv)}</div><div class="change">${myTxs.filter(t => t.toUserId === currentUser.id).length} transactions</div></div>
+    <div class="stat-card purple"><div class="ico">↑</div><div class="label">Total Sent</div><div class="value">₹${fmt(totalSent)}</div><div class="change">${myTxs.filter(t => t.fromUserId === currentUser.id).length} transactions</div></div>
+    <div class="stat-card yellow"><div class="ico">⚡</div><div class="label">My Transactions</div><div class="value">${myTxs.length}</div><div class="change">${myTxs.filter(t => t.suspicious).length} flagged</div></div>
+  `;
+
+  const recent = myTxs.slice(0,5);
+  if (recent.length === 0) {
+    document.getElementById('user-recent-tx').innerHTML = '<div class="empty-state"><div class="ico">◈</div><p>No transactions yet</p></div>';
+  } else {
+    document.getElementById('user-recent-tx').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Type</th><th>Party</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>
+      ${recent.map(tx=>{
+        const isSender = tx.fromUserId === currentUser.id;
+        return `<tr>
+          <td><span style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'▲ Sent':'▼ Received'}</span></td>
+          <td>${isSender ? (tx.toName||tx.toUsername) : (tx.fromName||tx.fromUsername)}</td>
+          <td class="mono" style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'-':'+'}₹${fmt(tx.amount)}</td>
+          <td><span class="badge ${tx.status}">${tx.status}</span></td>
+          <td class="mono">${fmtDate(tx.timestamp)}</td>
+        </tr>`;
+      }).join('')}
+    </tbody></table></div>`;
+  }
+
+  document.getElementById('user-account-info').innerHTML = `
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Username</div><div class="info-value">${currentUser.username}</div></div>
+      <div class="info-item"><div class="info-label">Email</div><div class="info-value">${currentUser.email}</div></div>
+      <div class="info-item"><div class="info-label">Department</div><div class="info-value">${currentUser.department || '—'}</div></div>
+      <div class="info-item"><div class="info-label">Account Status</div><div class="info-value"><span class="badge active">Active</span></div></div>
+      <div class="info-item" style="grid-column:1/-1"><div class="info-label">Wallet Address</div><div class="wallet-display">${currentUser.walletAddress}</div></div>
+    </div>
+  `;
+}
+
+// ─────────────────── PROFILE ──────────────────────────────
+function loadProfile() {
+  document.getElementById('edit-fullname').value = currentUser.fullName;
+  document.getElementById('edit-phone').value = currentUser.phone || '';
+  document.getElementById('edit-dept').value = currentUser.department || '';
+  renderProfileView();
+}
+
+function renderProfileView() {
+  document.getElementById('profile-view').innerHTML = `
+    <div class="info-grid">
+      <div class="info-item"><div class="info-label">Full Name</div><div class="info-value">${currentUser.fullName}</div></div>
+      <div class="info-item"><div class="info-label">Username</div><div class="info-value mono">${currentUser.username}</div></div>
+      <div class="info-item"><div class="info-label">Email</div><div class="info-value">${currentUser.email}</div></div>
+      <div class="info-item"><div class="info-label">Phone</div><div class="info-value">${currentUser.phone || '—'}</div></div>
+      <div class="info-item"><div class="info-label">Department</div><div class="info-value">${currentUser.department || '—'}</div></div>
+      <div class="info-item"><div class="info-label">Role</div><div class="info-value"><span class="badge ${currentUser.role}">${currentUser.role}</span></div></div>
+      <div class="info-item"><div class="info-label">Member Since</div><div class="info-value mono">${fmtDate(currentUser.createdAt)}</div></div>
+      <div class="info-item" style="grid-column:1/-1"><div class="info-label">Wallet Address</div><div class="wallet-display">${currentUser.walletAddress}</div></div>
+    </div>
+  `;
+}
+
+function toggleEditProfile() {
+  const v = document.getElementById('profile-view');
+  const e = document.getElementById('profile-edit');
+  const showing = e.style.display !== 'none';
+  v.style.display = showing ? 'block' : 'none';
+  e.style.display = showing ? 'none' : 'block';
+}
+
+async function saveProfile() {
+  const fullName = document.getElementById('edit-fullname').value.trim();
+  const phone = document.getElementById('edit-phone').value.trim();
+  const department = document.getElementById('edit-dept').value.trim();
+  if (!fullName) { showToast('Full name is required', 'error'); return; }
+  currentUser.fullName = fullName; currentUser.phone = phone; currentUser.department = department;
+  renderProfileView(); toggleEditProfile();
+  document.getElementById('sb-name').textContent = fullName;
+  showToast('Profile updated successfully', 'success');
+  if (!DEMO_MODE) {
+    await apiFetch('/users/profile', 'PUT', { fullName, phone, department });
+  }
+}
+
+async function changePassword() {
+  const cur = document.getElementById('cur-pass').value;
+  const nw = document.getElementById('new-pass').value;
+  const cf = document.getElementById('conf-pass').value;
+  if (!cur || !nw || !cf) { showToast('All fields required', 'error'); return; }
+  if (nw !== cf) { showToast('Passwords do not match', 'error'); return; }
+  if (nw.length < 6) { showToast('Min 6 characters', 'error'); return; }
+  if (DEMO_MODE) {
+    showToast('Password changed (demo mode)', 'success');
+    document.getElementById('cur-pass').value = document.getElementById('new-pass').value = document.getElementById('conf-pass').value = '';
+    return;
+  }
+  const res = await apiFetch('/auth/change-password', 'POST', { currentPassword: cur, newPassword: nw });
+  if (res) { showToast('Password changed successfully', 'success'); document.getElementById('cur-pass').value = document.getElementById('new-pass').value = document.getElementById('conf-pass').value = ''; }
+}
+
+// ─────────────────── TRANSFER ─────────────────────────────
+function loadTransferPage() {
+  document.getElementById('transfer-balance').textContent = '₹' + fmt(currentUser.balance);
+}
+
+let recipientTimeout = null;
+function searchRecipient(val) {
+  clearTimeout(recipientTimeout);
+  const el = document.getElementById('recipient-suggestions');
+  if (val.length < 2) { el.innerHTML = ''; return; }
+  recipientTimeout = setTimeout(async () => {
+    let users = [];
+    if (DEMO_MODE) {
+      users = [
+        { username:'junaid', fullName:'MD Junaid', walletAddress:'0x1234...' },
+        { username:'rajesh', fullName:'Rajesh Padashetty', walletAddress:'0xabcd...' },
+        { username:'sharanagouda', fullName:'Sharanagouda', walletAddress:'0x9876...' }
+      ].filter(u => u.username !== currentUser.username && (u.username.includes(val.toLowerCase()) || u.fullName.toLowerCase().includes(val.toLowerCase())));
+    } else {
+      const res = await apiFetch(`/users/search/${encodeURIComponent(val)}`);
+      users = res || [];
+    }
+
+    if (users.length === 0) { el.innerHTML = ''; return; }
+    el.innerHTML = `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">
+      ${users.map(u=>`<div onclick="selectRecipient('${u.username}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+        <strong>${u.fullName}</strong> <span class="mono" style="color:var(--text3)">@${u.username}</span>
+      </div>`).join('')}
+    </div>`;
+  }, 300);
+}
+
+function selectRecipient(username) {
+  document.getElementById('tx-to').value = username;
+  document.getElementById('recipient-suggestions').innerHTML = '';
+}
+
+async function doTransfer() {
+  const to = document.getElementById('tx-to').value.trim();
+  const amount = parseFloat(document.getElementById('tx-amount').value);
+  const note = document.getElementById('tx-note').value.trim();
+
+  if (!to) { showToast('Enter recipient username', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  if (amount > currentUser.balance) { showToast('Insufficient balance', 'error'); return; }
+  if (to === currentUser.username) { showToast('Cannot transfer to yourself', 'error'); return; }
+
+  if (DEMO_MODE) {
+    const fee = parseFloat((amount * 0.001).toFixed(4));
+    currentUser.balance = parseFloat((currentUser.balance - amount - fee).toFixed(2));
+    document.getElementById('transfer-balance').textContent = '₹' + fmt(currentUser.balance);
+    document.getElementById('tx-to').value = '';
+    document.getElementById('tx-amount').value = '';
+    document.getElementById('tx-note').value = '';
+
+    const score = amount > 5000 ? 0.85 : amount > 1000 ? 0.4 : 0.1;
+    const suspicious = score >= 0.5;
+    if (suspicious) {
+      showToast(`⚠️ Transfer flagged for review. Risk score: ${(score*100).toFixed(0)}%`, 'warning');
+    } else {
+      showToast(`✓ Transfer of ₹${fmt(amount)} to ${to} confirmed!`, 'success');
+    }
+    return;
+  }
+
+  const res = await apiFetch('/transactions/transfer', 'POST', { toUsername: to, amount, note });
+  if (!res) return;
+
+  currentUser.balance = res.newBalance;
+  document.getElementById('transfer-balance').textContent = '₹' + fmt(currentUser.balance);
+  document.getElementById('tx-to').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-note').value = '';
+
+  showToast(res.warning || `✓ Transfer of ₹${fmt(amount)} to ${to} confirmed!`, res.warning ? 'warning' : 'success');
+  loadUserDashboard();
+  if (document.getElementById('page-history').classList.contains('active')) {
+    await loadHistory(1);
+  }
+}
+
+// ─────────────────── HISTORY ──────────────────────────────
+async function loadHistory(page=1) {
+  let txs = [];
+  if (DEMO_MODE) {
+    txs = await getMockUserTx();
+  } else {
+    const res = await apiFetch(`/transactions/my?page=${page}&limit=1000`);
+    if (!res) return;
+    txs = res.transactions || [];
+  }
+  const myTxs = txs.filter(tx => tx.fromUserId === currentUser.id || tx.toUserId === currentUser.id);
+  document.getElementById('tx-count').textContent = `${myTxs.length} total`;
+
+  document.getElementById('history-tbody').innerHTML = myTxs.slice((page-1)*10, page*10).map(tx => {
+    const isSender = tx.fromUserId === currentUser.id;
+    const party = isSender ? (tx.toName || tx.toUsername) : (tx.fromName || tx.fromUsername);
+    const score = tx.suspicionScore || 0;
+    const fillColor = score > 0.7 ? 'var(--red)' : score > 0.4 ? 'var(--yellow)' : 'var(--green)';
+    return `<tr>
+      <td><span class="mono truncate" title="${tx.txHash}">${tx.txHash.slice(0,16)}...</span></td>
+      <td><span style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'▲ Sent':'▼ Recv'}</span></td>
+      <td>${party}</td>
+      <td class="mono" style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'-':'+'}₹${fmt(tx.amount)}</td>
+      <td class="mono">₹${tx.fee}</td>
+      <td><span class="badge ${tx.status}">${tx.status}</span></td>
+      <td>
+        <div class="suspicion-score">
+          <div class="score-bar"><div class="score-fill" style="width:${score*100}%;background:${fillColor}"></div></div>
+          <span class="mono">${(score*100).toFixed(0)}%</span>
+        </div>
+      </td>
+      <td class="mono">${fmtDate(tx.timestamp)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="ico">◈</div><p>No transactions</p></div></td></tr>`;
+}
+
+// ─────────────────── ADMIN OVERVIEW ───────────────────────
+async function loadAdminOverview() {
+  let data = null;
+  if (DEMO_MODE) {
+    data = getMockOverview();
+  } else {
+    data = await apiFetch('/admin/overview');
+    if (!data) { data = getMockOverview(); }
+  }
+  const s = data.stats;
+
+  document.getElementById('devops-alert-count').textContent = s.unresolvedAlerts;
+  const badge = document.getElementById('alert-badge');
+  if (badge) badge.textContent = s.unresolvedAlerts;
+
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat-card blue"><div class="ico">◎</div><div class="label">Total Users</div><div class="value">${s.totalUsers}</div><div class="change">${s.activeUsers} active</div></div>
+    <div class="stat-card green"><div class="ico">◈</div><div class="label">Total Transactions</div><div class="value">${s.totalTransactions}</div><div class="change">${s.confirmedTxs} confirmed</div></div>
+    <div class="stat-card purple"><div class="ico">₹</div><div class="label">Total Volume</div><div class="value">₹${fmt(s.totalVolume)}</div><div class="change">All time</div></div>
+    <div class="stat-card red"><div class="ico">⚠</div><div class="label">Flagged Transactions</div><div class="value">${s.flaggedTxs}</div><div class="change">${s.unresolvedAlerts} alerts unresolved</div></div>
+  `;
+
+  // Chart
+  const chart = data.chartData;
+  const maxVol = Math.max(...chart.map(d=>d.volume), 1);
+  document.getElementById('admin-chart').innerHTML = chart.map(d=>`
+    <div class="chart-bar-wrap">
+      <div class="chart-bar normal" style="height:${Math.max(4,(d.volume/maxVol)*100)}px" title="₹${fmt(d.volume)}"></div>
+      ${d.suspicious>0?`<div class="chart-bar suspicious" style="height:${Math.max(4,(d.suspicious/Math.max(...chart.map(c=>c.suspicious),1))*40)}px" title="${d.suspicious} suspicious"></div>`:''}
+      <div class="chart-label">${d.date.slice(5)}</div>
+    </div>
+  `).join('');
+
+  // Alerts preview
+  const alerts = getMockAlerts().filter(a=>!a.resolved).slice(0,3);
+  document.getElementById('admin-alert-preview').innerHTML = alerts.length === 0
+    ? '<div class="empty-state"><div class="ico">✓</div><p>No active alerts</p></div>'
+    : alerts.map(a=>`
+      <div class="alert-card ${a.severity}">
+        <div class="alert-ico">${a.severity==='critical'?'🔴':'🟡'}</div>
+        <div class="alert-msg">
+          <div class="alert-title">${a.message}</div>
+          <div class="alert-meta">${a.username || a.userId} · ${fmtDate(a.timestamp)} · Score: ${a.suspicionScore ? (a.suspicionScore*100).toFixed(0)+'%' : '—'}</div>
+        </div>
+        <span class="badge ${a.severity}">${a.severity}</span>
+      </div>`).join('');
+
+  // Recent tx
+  const txs = getMockAllTx().slice(0,5);
+  document.getElementById('admin-recent-tx').innerHTML = `<div class="table-wrap"><table><thead><tr><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Risk</th><th>Date</th></tr></thead><tbody>
+    ${txs.map(tx=>`<tr>
+      <td>${tx.fromName||tx.fromUsername}</td>
+      <td>${tx.toName||tx.toUsername}</td>
+      <td class="mono">₹${fmt(tx.amount)}</td>
+      <td><span class="badge ${tx.status}">${tx.status}</span></td>
+      <td><span class="mono" style="color:${tx.suspicionScore>0.7?'var(--red)':tx.suspicionScore>0.4?'var(--yellow)':'var(--green)'}">${((tx.suspicionScore||0)*100).toFixed(0)}%</span></td>
+      <td class="mono">${fmtDate(tx.timestamp)}</td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ─────────────────── ADMIN TRANSACTIONS ───────────────────
+async function loadAllTx(page=1) {
+  const suspicious = document.getElementById('tx-filter-suspicious')?.value;
+  let txs = [];
+  if (DEMO_MODE) {
+    txs = getMockAllTx();
+  } else {
+    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}`;
+    const res = await apiFetch(`/transactions/all${query}`);
+    if (!res) return;
+    txs = res.transactions || [];
+  }
+  if (suspicious === 'true' && DEMO_MODE) txs = txs.filter(t=>t.suspicious);
+
+  document.getElementById('admin-tx-tbody').innerHTML = txs.map(tx=>`
+    <tr>
+      <td><span class="mono truncate" title="${tx.txHash}">${tx.txHash.slice(0,14)}...</span></td>
+      <td>${tx.fromName||tx.fromUsername}</td>
+      <td>${tx.toName||tx.toUsername}</td>
+      <td class="mono">₹${fmt(tx.amount)}</td>
+      <td><span class="badge ${tx.status}">${tx.status}</span></td>
+      <td>
+        <div class="suspicion-score">
+          <div class="score-bar"><div class="score-fill" style="width:${(tx.suspicionScore||0)*100}%;background:${(tx.suspicionScore||0)>0.7?'var(--red)':(tx.suspicionScore||0)>0.4?'var(--yellow)':'var(--green)'}"></div></div>
+          <span class="mono">${((tx.suspicionScore||0)*100).toFixed(0)}%</span>
+        </div>
+      </td>
+      <td style="max-width:200px;font-size:11px;color:var(--text3)">${(tx.suspicionReasons||[]).join(', ')||'—'}</td>
+      <td class="mono">${fmtDate(tx.timestamp)}</td>
+    </tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><div class="ico">◈</div><p>No transactions</p></div></td></tr>';
+}
+
+// ─────────────────── ALERTS ───────────────────────────────
+async function loadAlerts() {
+  const filter = document.getElementById('alert-filter')?.value;
+  let alerts = [];
+  if (DEMO_MODE) {
+    alerts = getMockAlerts();
+    if (filter === 'false') alerts = alerts.filter(a=>!a.resolved);
+    if (filter === 'true') alerts = alerts.filter(a=>a.resolved);
+  } else {
+    const query = filter ? `?resolved=${filter}` : '';
+    const res = await apiFetch(`/alerts${query}`);
+    alerts = res || [];
+  }
+
+  document.getElementById('alerts-list').innerHTML = alerts.length === 0
+    ? '<div class="empty-state"><div class="ico">✓</div><p>No alerts found</p></div>'
+    : alerts.map(a=>`
+      <div class="alert-card ${a.severity}" style="margin-bottom:12px">
+        <div class="alert-ico">${a.severity==='critical'?'🔴':a.severity==='high'?'🟡':'🔵'}</div>
+        <div class="alert-msg" style="flex:1">
+          <div class="alert-title">${a.message}</div>
+          <div class="alert-meta" style="margin-top:4px">
+            User: <strong>${a.userName||a.userId}</strong> (@${a.username||'?'}) ·
+            Amount: ${a.transactionAmount ? '₹'+fmt(a.transactionAmount) : '—'} ·
+            Score: ${a.suspicionScore ? (a.suspicionScore*100).toFixed(0)+'%' : '—'} ·
+            ${fmtDate(a.timestamp)}
+          </div>
+          ${a.resolved ? `<div style="font-size:11px;color:var(--green);margin-top:4px">✓ Resolved by ${a.resolvedBy} at ${fmtDate(a.resolvedAt)}</div>` : ''}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+          <span class="badge ${a.severity}">${a.severity}</span>
+          ${!a.resolved ? `<button class="btn btn-success" style="font-size:11px;padding:5px 10px" onclick="resolveAlert('${a.id}')">✓ Resolve</button>` : ''}
+        </div>
+      </div>`).join('');
+}
+
+async function resolveAlert(id) {
+  if (DEMO_MODE) {
+    const alerts = getMockAlerts();
+    const alert = alerts.find(a=>a.id===id);
+    if (alert) { alert.resolved = true; alert.resolvedBy = 'admin'; alert.resolvedAt = new Date().toISOString(); }
+    showToast('Alert resolved', 'success');
+    loadAlerts();
+  } else {
+    const res = await apiFetch(`/alerts/${id}/resolve`, 'PUT', {});
+    if (res) { showToast('Alert resolved', 'success'); loadAlerts(); }
+    else showToast('Failed to resolve alert', 'error');
+  }
+}
+
+async function loadAdminUsers() {
+  const search = document.getElementById('user-search')?.value.trim() || '';
+  let users = [];
+  if (DEMO_MODE) {
+    users = getMockAllUsers();
+    if (search) users = users.filter(u => u.username.includes(search) || u.fullName.toLowerCase().includes(search) || u.email.includes(search));
+  } else {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    const res = await apiFetch(`/admin/users${query}`);
+    if (!res) return;
+    users = res;
+  }
+
+  document.getElementById('admin-users-tbody').innerHTML = users.map(u=>`
+    <tr>
+      <td>
+        <div style="font-weight:600">${u.fullName}</div>
+        <div class="mono" style="color:var(--text3)">@${u.username}</div>
+      </td>
+      <td>${u.email}</td>
+      <td><span class="mono truncate" style="font-size:10px;color:var(--text3)">${u.walletAddress.slice(0,18)}...</span></td>
+      <td class="mono" style="color:var(--primary)">₹${fmt(u.balance)}</td>
+      <td><span class="badge ${u.role}">${u.role}</span></td>
+      <td><span class="badge ${u.status}">${u.status}</span></td>
+      <td class="mono">${fmtDate(u.createdAt)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick='openEditUserModal(${JSON.stringify(u)})'>Edit</button>
+          ${u.id !== 'admin-001' ? `<button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="deleteUser('${u.id}','${u.fullName}')">Del</button>` : ''}
+        </div>
+      </td>
+    </tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><div class="ico">◎</div><p>No users found</p></div></td></tr>';
+}
+
+function openAddUserModal() { openModal('modal-add-user'); }
+
+async function submitAddUser() {
+  const fullName = document.getElementById('nu-fullname').value.trim();
+  const username = document.getElementById('nu-username').value.trim();
+  const email = document.getElementById('nu-email').value.trim();
+  const password = document.getElementById('nu-password').value;
+  const phone = document.getElementById('nu-phone').value.trim();
+  const department = document.getElementById('nu-dept').value.trim();
+  const role = document.getElementById('nu-role').value;
+  const balance = parseFloat(document.getElementById('nu-balance').value) || 0;
+
+  if (!fullName || !username || !email || !password) { showToast('Required fields missing', 'error'); return; }
+  if (password.length < 6) { showToast('Password min 6 characters', 'error'); return; }
+
+  if (DEMO_MODE) {
+    const newUser = {
+      id: 'user-' + Date.now(),
+      username, email, fullName, role, phone, department, balance,
+      status: 'active',
+      walletAddress: '0x' + Array.from({length:40},()=>Math.floor(Math.random()*16).toString(16)).join(''),
+      createdAt: new Date().toISOString(),
+      lastLogin: null
+    };
+    MOCK_DB.users.push(newUser);
+    closeModal('modal-add-user');
+    loadAdminUsers();
+    showToast(`User ${fullName} created`, 'success');
+    ['nu-fullname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+    return;
+  }
+
+  const payload = { username, email, password, fullName, role, phone, department, balance };
+  const res = await apiFetch('/admin/users', 'POST', payload);
+  if (!res) return;
+  closeModal('modal-add-user');
+  loadAdminUsers();
+  showToast(`User ${res.fullName} created`, 'success');
+  ['nu-fullname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+}
+
+function openEditUserModal(u) {
+  document.getElementById('eu-id').value = u.id;
+  document.getElementById('eu-fullname').value = u.fullName;
+  document.getElementById('eu-email').value = u.email;
+  document.getElementById('eu-phone').value = u.phone || '';
+  document.getElementById('eu-dept').value = u.department || '';
+  document.getElementById('eu-status').value = u.status;
+  document.getElementById('eu-role').value = u.role;
+  document.getElementById('eu-balance').value = u.balance;
+  document.getElementById('eu-password').value = '';
+  openModal('modal-edit-user');
+}
+
+async function submitEditUser() {
+  const id = document.getElementById('eu-id').value;
+  const fullName = document.getElementById('eu-fullname').value.trim();
+  const email = document.getElementById('eu-email').value.trim();
+  const phone = document.getElementById('eu-phone').value.trim();
+  const department = document.getElementById('eu-dept').value.trim();
+  const status = document.getElementById('eu-status').value;
+  const role = document.getElementById('eu-role').value;
+  const balance = parseFloat(document.getElementById('eu-balance').value) || 0;
+  const password = document.getElementById('eu-password').value;
+
+  if (DEMO_MODE) {
+    const u = MOCK_DB.users.find(u=>u.id===id);
+    if (!u) return;
+    u.fullName = fullName;
+    u.email = email;
+    u.phone = phone;
+    u.department = department;
+    u.status = status;
+    u.role = role;
+    u.balance = balance;
+    closeModal('modal-edit-user');
+    loadAdminUsers();
+    showToast('User updated', 'success');
+    return;
+  }
+
+  const payload = { fullName, email, phone, department, status, role, balance };
+  if (password) payload.password = password;
+  const res = await apiFetch(`/admin/users/${id}`, 'PUT', payload);
+  if (!res) return;
+  closeModal('modal-edit-user');
+  loadAdminUsers();
+  showToast('User updated', 'success');
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  if (DEMO_MODE) {
+    MOCK_DB.users = MOCK_DB.users.filter(u=>u.id!==id);
+    loadAdminUsers();
+    showToast(`User ${name} deleted`, 'success');
+    return;
+  }
+
+  const res = await apiFetch(`/admin/users/${id}`, 'DELETE');
+  if (!res) return;
+  loadAdminUsers();
+  showToast(`User ${name} deleted`, 'success');
+}
+
+// ─────────────────── ADMIN CI/CD ──────────────────────────
+async function loadAdminCICD() {
+  let data = null;
+  if (DEMO_MODE) {
+    data = getMockCICDData();
+  } else {
+    data = await apiFetch('/admin/cicd');
+    if (!data) { data = getMockCICDData(); }
+  }
+
+  const s = data.stats;
+
+  document.getElementById('cicd-stats').innerHTML = `
+    <div class="stat-card green"><div class="ico">⚙</div><div class="label">Active Pipelines</div><div class="value">${s.activePipelines}</div><div class="change">Running builds</div></div>
+    <div class="stat-card blue"><div class="ico">✓</div><div class="label">Successful Builds</div><div class="value">${s.successfulBuilds}</div><div class="change">Last 24h</div></div>
+    <div class="stat-card red"><div class="ico">✗</div><div class="label">Failed Builds</div><div class="value">${s.failedBuilds}</div><div class="change">Needs attention</div></div>
+    <div class="stat-card yellow"><div class="ico">⏱</div><div class="label">Avg Build Time</div><div class="value">${s.avgBuildTime}m</div><div class="change">Target: 15m</div></div>
+  `;
+
+  // Pipeline status
+  const pipelines = data.pipelines;
+  document.getElementById('pipeline-status').innerHTML = pipelines.map(p => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:12px;height:12px;border-radius:50%;background:${p.status === 'running' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}"></div>
+        <div>
+          <div style="font-weight:600;font-size:14px">${p.name}</div>
+          <div style="font-size:11px;color:var(--text3)">${p.branch} · ${p.commit.slice(0,8)}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;color:${p.status === 'running' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}">${p.status.toUpperCase()}</div>
+        <div style="font-size:10px;color:var(--text3)">${p.duration || '—'}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Recent builds
+  const builds = data.recentBuilds;
+  document.getElementById('recent-builds').innerHTML = builds.map(b => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:500">${b.project}</div>
+        <div style="font-size:11px;color:var(--text3)">Build #${b.buildNumber} · ${b.trigger}</div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${b.status}">${b.status}</span>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${b.duration}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Deployment history
+  const deployments = data.deployments;
+  document.getElementById('deployment-history').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Version</th><th>Environment</th><th>Status</th><th>Deployed By</th><th>Time</th></tr></thead><tbody>
+    ${deployments.map(d => `<tr>
+      <td>${d.service}</td>
+      <td class="mono">${d.version}</td>
+      <td><span class="badge ${d.environment === 'production' ? 'critical' : 'medium'}">${d.environment}</span></td>
+      <td><span class="badge ${d.status}">${d.status}</span></td>
+      <td>${d.deployedBy}</td>
+      <td class="mono">${fmtDate(d.timestamp)}</td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+// ─────────────────── MOCK DATA ────────────────────────────
+const MOCK_DB = {
+  users: [
+    { id:'admin-001', username:'admin', email:'admin@blockchainmonitor.com', fullName:'System Administrator', role:'admin', walletAddress:'0xADMIN000000000000000000000000000000000001', balance:999999, status:'active', phone:'+91-9876543210', department:'IT Security', createdAt:'2024-01-01T00:00:00.000Z', lastLogin:'2024-06-05T08:00:00.000Z' },
+    { id:'user-001', username:'junaid', email:'junaid@example.com', fullName:'MD Junaid', role:'user', walletAddress:'0x1234567890abcdef1234567890abcdef12345678', balance:5000, status:'active', phone:'+91-9988776655', department:'Engineering', createdAt:'2024-01-15T10:00:00.000Z', lastLogin:null },
+    { id:'user-002', username:'rajesh', email:'rajesh@example.com', fullName:'Rajesh Padashetty', role:'user', walletAddress:'0xabcdef1234567890abcdef1234567890abcdef12', balance:7500.50, status:'active', phone:'+91-9876543211', department:'Finance', createdAt:'2024-01-16T11:00:00.000Z', lastLogin:null },
+    { id:'user-003', username:'sharanagouda', email:'sharanagouda@example.com', fullName:'Sharanagouda', role:'user', walletAddress:'0x9876543210fedcba9876543210fedcba98765432', balance:3200.75, status:'active', phone:'+91-9765432100', department:'Operations', createdAt:'2024-01-17T09:00:00.000Z', lastLogin:null }
+  ]
+};
+
+function getMockAllUsers() { return MOCK_DB.users; }
+
+function getMockAllTx() {
+  return [
+    { id:'tx-001', txHash:'0xabc123def456abc123def456abc123def456abc123def456abc123def456abc1', fromUserId:'user-001', toUserId:'user-002', fromName:'MD Junaid', toName:'Rajesh Padashetty', fromUsername:'junaid', toUsername:'rajesh', amount:150, fee:0.5, status:'confirmed', blockNumber:18450001, timestamp:'2024-06-01T10:30:00.000Z', suspicious:false, suspicionScore:0.05, suspicionReasons:[] },
+    { id:'tx-002', txHash:'0xdef789ghi012def789ghi012def789ghi012def789ghi012def789ghi012def7', fromUserId:'user-002', toUserId:'user-003', fromName:'Rajesh Padashetty', toName:'Sharanagouda', fromUsername:'rajesh', toUsername:'sharanagouda', amount:9800, fee:2.1, status:'flagged', blockNumber:18450025, timestamp:'2024-06-02T02:15:00.000Z', suspicious:true, suspicionScore:0.87, suspicionReasons:['Large amount','Unusual hour (2 AM)','Velocity spike'] },
+    { id:'tx-003', txHash:'0x111222333444555666777888999aaabbbccc111222333444555666777888999a', fromUserId:'user-003', toUserId:'user-001', fromName:'Sharanagouda', toName:'MD Junaid', fromUsername:'sharanagouda', toUsername:'junaid', amount:500, fee:0.8, status:'confirmed', blockNumber:18450100, timestamp:'2024-06-03T14:00:00.000Z', suspicious:false, suspicionScore:0.12, suspicionReasons:[] },
+    { id:'tx-004', txHash:'0xfedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210', fromUserId:'user-001', toUserId:'user-003', fromName:'MD Junaid', toName:'Sharanagouda', fromUsername:'junaid', toUsername:'sharanagouda', amount:25000, fee:5.0, status:'flagged', blockNumber:18450200, timestamp:'2024-06-04T23:55:00.000Z', suspicious:true, suspicionScore:0.95, suspicionReasons:['Extremely large amount','Unusual hour (midnight)','New recipient','Amount exceeds 30-day average by 500%'] }
+  ];
+}
+
+async function getMockUserTx() { return getMockAllTx(); }
+
+function getMockAlerts() {
+  return [
+    { id:'alert-001', type:'suspicious_transaction', severity:'high', transactionId:'tx-002', userId:'user-002', userName:'Rajesh Padashetty', username:'rajesh', transactionAmount:9800, suspicionScore:0.87, message:'Suspicious transaction detected: Large amount transfer at 2 AM with velocity spike', timestamp:'2024-06-02T02:15:05.000Z', resolved:false, resolvedBy:null, resolvedAt:null },
+    { id:'alert-002', type:'suspicious_transaction', severity:'critical', transactionId:'tx-004', userId:'user-001', userName:'MD Junaid', username:'junaid', transactionAmount:25000, suspicionScore:0.95, message:'CRITICAL: Transaction amount exceeds 30-day average by 500% at midnight', timestamp:'2024-06-04T23:55:05.000Z', resolved:false, resolvedBy:null, resolvedAt:null }
+  ];
+}
+
+function getMockOverview() {
+  const txs = getMockAllTx();
+  const users = getMockAllUsers();
+  const alerts = getMockAlerts();
+  const last7 = [];
+  for (let i=6;i>=0;i--) {
+    const d=new Date(); d.setDate(d.getDate()-i);
+    const ds=d.toISOString().split('T')[0];
+    const dayTxs=txs.filter(t=>t.timestamp.startsWith(ds));
+    last7.push({date:ds,count:dayTxs.length,volume:dayTxs.reduce((s,t)=>s+t.amount,0),suspicious:dayTxs.filter(t=>t.suspicious).length});
+  }
+  return {
+    stats: { totalUsers:users.filter(u=>u.role==='user').length, activeUsers:users.filter(u=>u.role==='user'&&u.status==='active').length, suspendedUsers:0, totalTransactions:txs.length, totalVolume:txs.reduce((s,t)=>s+t.amount,0), suspiciousTransactions:txs.filter(t=>t.suspicious).length, unresolvedAlerts:alerts.filter(a=>!a.resolved).length, recentTransactions:txs.length, confirmedTxs:txs.filter(t=>t.status==='confirmed').length, flaggedTxs:txs.filter(t=>t.status==='flagged').length },
+    chartData:last7
+  };
+}
+
+function getMockCICDData() {
+  return {
+    stats: {
+      activePipelines: 3,
+      successfulBuilds: 24,
+      failedBuilds: 2,
+      avgBuildTime: 12
+    },
+    pipelines: [
+      { name: 'Backend API', branch: 'main', commit: 'a1b2c3d4e5f6', status: 'running', duration: '8m 32s' },
+      { name: 'Frontend UI', branch: 'develop', commit: 'f6e5d4c3b2a1', status: 'success', duration: '12m 15s' },
+      { name: 'ML Anomaly Detector', branch: 'feature/anomaly-v2', commit: '9h8g7f6e5d4', status: 'failed', duration: '5m 48s' }
+    ],
+    recentBuilds: [
+      { project: 'Backend API', buildNumber: 145, trigger: 'Push to main', status: 'success', duration: '11m 23s' },
+      { project: 'Frontend UI', buildNumber: 89, trigger: 'Pull Request', status: 'success', duration: '8m 45s' },
+      { project: 'ML Anomaly Detector', buildNumber: 67, trigger: 'Push to feature', status: 'failed', duration: '5m 48s' },
+      { project: 'Docker Images', buildNumber: 234, trigger: 'Scheduled', status: 'success', duration: '15m 12s' },
+      { project: 'Security Tests', buildNumber: 156, trigger: 'Manual', status: 'running', duration: '3m 27s' }
+    ],
+    deployments: [
+      { service: 'Backend API', version: 'v1.2.3', environment: 'production', status: 'success', deployedBy: 'jenkins-ci', timestamp: '2024-06-05T14:30:00.000Z' },
+      { service: 'Frontend UI', version: 'v2.1.0', environment: 'staging', status: 'success', deployedBy: 'github-actions', timestamp: '2024-06-05T13:15:00.000Z' },
+      { service: 'ML Service', version: 'v1.0.8', environment: 'production', status: 'failed', deployedBy: 'jenkins-ci', timestamp: '2024-06-05T12:00:00.000Z' },
+      { service: 'Database', version: 'v3.4.1', environment: 'production', status: 'success', deployedBy: 'terraform', timestamp: '2024-06-05T10:45:00.000Z' },
+      { service: 'Monitoring', version: 'v1.5.2', environment: 'staging', status: 'running', deployedBy: 'github-actions', timestamp: '2024-06-05T09:20:00.000Z' }
+    ]
+  };
+}
+
+// ─────────────────── HELPERS ──────────────────────────────
+async function apiFetch(path, method='GET', body=null) {
+  try {
+    const opts = { method, headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${authToken}` } };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(API_BASE + path, opts);
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Error', 'error'); return null; }
+    return data;
+  } catch(e) { showToast('Network error', 'error'); return null; }
+}
+
+function fmt(n) {
+  if (n === undefined || n === null) return '0.00';
+  return parseFloat(n).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }) + ' ' +
+    d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─────────────────── ADMIN TRANSFER ───────────────────────
+function openAdminTransferModal() {
+  document.getElementById('at-from').value = '';
+  document.getElementById('at-to').value = '';
+  document.getElementById('at-amount').value = '';
+  document.getElementById('at-note').value = '';
+  document.getElementById('from-suggestions').innerHTML = '';
+  document.getElementById('to-suggestions').innerHTML = '';
+  openModal('modal-admin-transfer');
+}
+
+async function searchAdminRecipient(field, val) {
+  const suggEl = document.getElementById(field === 'from' ? 'from-suggestions' : 'to-suggestions');
+  if (val.length < 2) { suggEl.innerHTML = ''; return; }
+  
+  let users = [];
+  if (DEMO_MODE) {
+    users = MOCK_DB.users.filter(u => (u.username.includes(val.toLowerCase()) || u.fullName.toLowerCase().includes(val.toLowerCase())));
+  } else {
+    const res = await apiFetch(`/users/search/${encodeURIComponent(val)}`);
+    users = res || [];
+  }
+
+  if (users.length === 0) { suggEl.innerHTML = ''; return; }
+  suggEl.innerHTML = `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">
+    ${users.map(u=>`<div onclick="selectAdminUser('${field}', '${u.username}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+      <strong>${u.fullName}</strong> <span class="mono" style="color:var(--text3)">@${u.username} · ₹${fmt(u.balance)}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
+function selectAdminUser(field, username) {
+  document.getElementById(field === 'from' ? 'at-from' : 'at-to').value = username;
+  document.getElementById(field === 'from' ? 'from-suggestions' : 'to-suggestions').innerHTML = '';
+}
+
+async function submitAdminTransfer() {
+  const from = document.getElementById('at-from').value.trim();
+  const to = document.getElementById('at-to').value.trim();
+  const amount = parseFloat(document.getElementById('at-amount').value);
+  const note = document.getElementById('at-note').value.trim();
+
+  if (!from || !to) { showToast('Select both sender and recipient', 'error'); return; }
+  if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
+  if (from === to) { showToast('Cannot transfer to same user', 'error'); return; }
+
+  if (DEMO_MODE) {
+    const senderU = MOCK_DB.users.find(u => u.username === from);
+    const recipientU = MOCK_DB.users.find(u => u.username === to);
+    if (!senderU || !recipientU) { showToast('User not found', 'error'); return; }
+    if (senderU.balance < amount) { showToast('Insufficient balance', 'error'); return; }
+
+    const fee = parseFloat((amount * 0.001).toFixed(4));
+    senderU.balance = parseFloat((senderU.balance - amount - fee).toFixed(2));
+    recipientU.balance = parseFloat((recipientU.balance + amount).toFixed(2));
+
+    const txHash = '0x' + Array.from({length:64},()=>Math.floor(Math.random()*16).toString(16)).join('');
+    const tx = {
+      id: 'tx-' + Date.now(),
+      txHash,
+      fromUserId: senderU.id,
+      toUserId: recipientU.id,
+      fromName: senderU.fullName,
+      toName: recipientU.fullName,
+      fromUsername: senderU.username,
+      toUsername: recipientU.username,
+      amount,
+      fee,
+      status: 'confirmed',
+      blockNumber: 18450000 + Math.floor(Math.random()*100000),
+      timestamp: new Date().toISOString(),
+      suspicious: false,
+      suspicionScore: 0,
+      suspicionReasons: [],
+      note: `[ADMIN] ${note || 'Administrative transfer'}`
+    };
+    MOCK_DB.transactions = MOCK_DB.transactions || [];
+    MOCK_DB.transactions.push(tx);
+
+    closeModal('modal-admin-transfer');
+    showToast(`✓ Transfer of ₹${fmt(amount)} from ${from} to ${to} completed!`, 'success');
+    loadAllTx();
+    return;
+  }
+
+  const res = await apiFetch('/transactions/admin-transfer', 'POST', { fromUsername: from, toUsername: to, amount, note });
+  if (!res) return;
+  closeModal('modal-admin-transfer');
+  showToast(`✓ Transfer of ₹${fmt(amount)} from ${from} to ${to} completed!`, 'success');
+  loadAllTx();
+}
+
+let toastId = 0;
+function showToast(msg, type='success') {
+  const c = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  el.id = 'toast-' + (++toastId);
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; el.style.transform='translateX(40px)'; el.style.transition='all 0.3s'; setTimeout(()=>el.remove(), 300); }, 3500);
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+</script>
+</body>
+</html>

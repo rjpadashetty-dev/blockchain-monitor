@@ -1,0 +1,10 @@
+{
+  "name": "blockchain-monitor-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Blockchain Security Monitor",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
