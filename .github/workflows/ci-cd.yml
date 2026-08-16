@@ -1,0 +1,36 @@
+name: Blockchain Monitor CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - run: cd backend && npm ci
+      - run: cd backend && npm test -- --passWithNoTests
+      - run: cd backend && npm audit --audit-level=high || true
+
+  build-and-deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: docker build -t bcmonitor-backend:${{ github.sha }} ./backend
+      - name: Start services
+        run: docker-compose up -d
+      - name: Health check
+        run: |
+          sleep 10
+          curl -f http://localhost:5000/api/health
