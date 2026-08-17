@@ -30,10 +30,9 @@ jobs:
         run: docker build -t bcmonitor-backend:${{ github.sha }} ./backend
       - name: Start services
         run: |
-          docker compose down --remove-orphans || true
-          docker compose up -d --build
-          sleep 10
+          docker compose -f frontend/docker-compose.yml down --remove-orphans || true
+          docker compose -f frontend/docker-compose.yml up -d --build
+          sleep 15
       - name: Health check
         run: |
-          sleep 5
           curl -f http://localhost:5000/api/health || exit 1
