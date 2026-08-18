@@ -459,6 +459,161 @@ router.get('/cicd', async (req, res) => {
   }
 });
 
+// ─── POST /api/admin/pipeline-status ──────────────────────────────────────────
+// Endpoint to receive real-time CI/CD pipeline metrics from GitHub Actions
+router.post('/pipeline-status', (req, res) => {
+  try {
+    const { workflow, status, commit, branch, timestamp, buildNumber, author } = req.body;
+    
+    // Validate required fields
+    if (!workflow || !status) {
+      return res.status(400).json({ error: 'Missing required fields: workflow, status' });
+    }
+    
+    // Create pipeline log entry
+    const pipelineLog = {
+      id: uuidv4(),
+      type: 'cicd-pipeline',
+      workflow,
+      status, // 'passed', 'failed', 'running'
+      commit: commit || 'unknown',
+      branch: branch || 'unknown',
+      timestamp: timestamp || new Date().toISOString(),
+      buildNumber: buildNumber || 0,
+      author: author || 'system',
+      createdAt: new Date().toISOString()
+    };
+    
+    // Store in systemLogs
+    if (!db.get('systemLogs').value()) {
+      db.set('systemLogs', []).write();
+    }
+    
+    db.get('systemLogs')
+      .push(pipelineLog)
+      .write();
+    
+    console.log(`✅ Pipeline status logged: ${workflow} - ${status}`);
+    res.status(201).json({ 
+      success: true, 
+      message: 'Pipeline status logged',
+      data: pipelineLog 
+    });
+  } catch (err) {
+    console.error('Error logging pipeline status:', err);
+    res.status(500).json({ error: 'Failed to log pipeline status' });
+  }
+});
+
+// ─── GET /api/admin/pipeline-status ───────────────────────────────────────────
+// Get CI/CD pipeline history and metrics
+router.get('/pipeline-status', (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+    const branch = req.query.branch || null;
+    
+    let logs = db.get('systemLogs')
+      .filter(log => log.type === 'cicd-pipeline')
+      .value() || [];
+    
+    // Filter by branch if provided
+    if (branch) {
+      logs = logs.filter(log => log.branch === branch);
+    }
+    
+    // Sort by timestamp descending (newest first)
+    logs = logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Limit results
+    const recentLogs = logs.slice(0, limit);
+    
+    // Calculate statistics
+    const totalPipelines = logs.length;
+    const passedPipelines = logs.filter(log => log.status === 'passed').length;
+    const failedPipelines = logs.filter(log => log.status === 'failed').length;
+    const successRate = totalPipelines > 0 ? ((passedPipelines / totalPipelines) * 100).toFixed(2) : 0;
+    
+    // Get latest status
+    const latestLog = logs[0] || null;
+    
+    res.json({
+      stats: {
+        totalPipelines,
+        passedPipelines,
+        failedPipelines,
+        successRate: `${successRate}%`,
+        latestStatus: latestLog?.status || 'unknown',
+        latestWorkflow: latestLog?.workflow || 'unknown'
+      },
+      recentBuilds: recentLogs,
+      limit,
+      branch: branch || 'all'
+    });
+  } catch (err) {
+    console.error('Error fetching pipeline status:', err);
+    res.status(500).json({ error: 'Failed to fetch pipeline status' });
+  }
+});
+
+// ─── GET /api/admin/pipeline-stats ───────────────────────────────────────────
+// Get detailed CI/CD pipeline statistics and trends
+router.get('/pipeline-stats', (req, res) => {
+  try {
+    const logs = db.get('systemLogs')
+      .filter(log => log.type === 'cicd-pipeline')
+      .value() || [];
+    
+    // Group by workflow
+    const byWorkflow = {};
+    logs.forEach(log => {
+      if (!byWorkflow[log.workflow]) {
+        byWorkflow[log.workflow] = { passed: 0, failed: 0, total: 0 };
+      }
+      byWorkflow[log.workflow].total++;
+      if (log.status === 'passed') {
+        byWorkflow[log.workflow].passed++;
+      } else if (log.status === 'failed') {
+        byWorkflow[log.workflow].failed++;
+      }
+    });
+    
+    // Calculate success rates by workflow
+    const workflowStats = Object.entries(byWorkflow).map(([workflow, stats]) => ({
+      workflow,
+      ...stats,
+      successRate: stats.total > 0 ? ((stats.passed / stats.total) * 100).toFixed(2) : 0
+    }));
+    
+    // Get last 7 days of builds
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentLogs = logs.filter(log => new Date(log.timestamp) > sevenDaysAgo);
+    
+    const dailyStats = {};
+    recentLogs.forEach(log => {
+      const date = new Date(log.timestamp).toISOString().split('T')[0];
+      if (!dailyStats[date]) {
+        dailyStats[date] = { passed: 0, failed: 0 };
+      }
+      if (log.status === 'passed') {
+        dailyStats[date].passed++;
+      } else if (log.status === 'failed') {
+        dailyStats[date].failed++;
+      }
+    });
+    
+    res.json({
+      byWorkflow: workflowStats,
+      last7Days: dailyStats,
+      totalPipelines: logs.length,
+      totalPassed: logs.filter(l => l.status === 'passed').length,
+      totalFailed: logs.filter(l => l.status === 'failed').length
+    });
+  } catch (err) {
+    console.error('Error fetching pipeline stats:', err);
+    res.status(500).json({ error: 'Failed to fetch pipeline statistics' });
+  }
+});
+
 module.exports = router;
 module.exports.buildProjectCICDData = buildProjectCICDData;
 module.exports.getLiveCICDData = getLiveCICDData;
