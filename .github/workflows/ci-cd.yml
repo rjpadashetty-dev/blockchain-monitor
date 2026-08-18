@@ -81,14 +81,14 @@ jobs:
       security-events: write
     steps:
       - name: Run Trivy vulnerability scanner on backend
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-backend.sarif'
       
       - name: Run Trivy vulnerability scanner on frontend
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           format: 'sarif'
