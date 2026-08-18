@@ -128,10 +128,19 @@ jobs:
           
           docker compose --project-directory . -f frontend/docker-compose.yml down --remove-orphans || true
           docker compose --project-directory . -f frontend/docker-compose.yml up -d
-          sleep 15
+          sleep 20
       
       - name: Health check
-        run: curl -f http://localhost:5000/api/health || exit 1
+        run: |
+          for i in {1..20}; do
+            curl -fsS http://localhost:5000/api/health && exit 0
+            echo "Waiting for backend..."
+            sleep 3
+          done
+          echo "Backend health check failed"
+          docker ps -a
+          docker compose --project-directory . -f frontend/docker-compose.yml logs backend --tail=50
+          exit 1
 
   deploy-production:
     needs: security-scan
@@ -153,7 +162,16 @@ jobs:
           
           docker compose --project-directory . -f frontend/docker-compose.yml down --remove-orphans || true
           docker compose --project-directory . -f frontend/docker-compose.yml up -d
-          sleep 15
+          sleep 20
       
       - name: Health check
-        run: curl -f http://localhost:5000/api/health || exit 1
+        run: |
+          for i in {1..20}; do
+            curl -fsS http://localhost:5000/api/health && exit 0
+            echo "Waiting for backend..."
+            sleep 3
+          done
+          echo "Backend health check failed"
+          docker ps -a
+          docker compose --project-directory . -f frontend/docker-compose.yml logs backend --tail=50
+          exit 1
