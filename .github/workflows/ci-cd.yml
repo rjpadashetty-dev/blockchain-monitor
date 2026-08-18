@@ -134,6 +134,15 @@ jobs:
           # Create network
           docker network create bcmonitor-net || true
           
+          # Create directories for volumes
+          mkdir -p /tmp/blockchain-monitor/db
+          mkdir -p /tmp/blockchain-monitor/prometheus
+          
+          # Initialize db.json if it doesn't exist
+          if [ ! -f /tmp/blockchain-monitor/db/db.json ]; then
+            echo '{"users":[],"transactions":[],"alerts":[]}' > /tmp/blockchain-monitor/db/db.json
+          fi
+          
           # Run backend
           docker run -d \
             --name bcmonitor-backend \
@@ -143,11 +152,12 @@ jobs:
             -e NODE_ENV=production \
             -e JWT_SECRET=blockchain-monitor-secret-change-in-production \
             -e FRONTEND_URL=http://localhost:3000 \
+            -v /tmp/blockchain-monitor/db:/app \
             --restart unless-stopped \
             ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           
           # Wait for backend to start
-          sleep 15
+          sleep 20
           
           # Run frontend
           docker run -d \
@@ -164,15 +174,28 @@ jobs:
       
       - name: Health check
         run: |
-          for i in {1..20}; do
-            if curl -fsS http://localhost:5000/api/health; then
-              echo "✅ Backend is healthy"
+          echo "🔍 Checking docker containers..."
+          docker ps -a
+          
+          echo "📋 Backend logs:"
+          docker logs bcmonitor-backend --tail=20
+          
+          echo "📋 Frontend logs:"
+          docker logs bcmonitor-frontend --tail=20 || true
+          
+          echo "🏥 Running health check..."
+          for i in {1..30}; do
+            echo "Attempt $i/30..."
+            if curl -fsS http://localhost:5000/api/health > /dev/null 2>&1; then
+              echo "✅ Backend is healthy!"
               exit 0
             fi
-            echo "⏳ Attempt $i - Waiting for backend..."
-            sleep 3
+            sleep 2
           done
-          echo "❌ Backend health check failed"
+          
+          echo "❌ Backend health check failed after 30 attempts"
+          echo "📊 Final docker status:"
           docker ps -a
-          docker logs bcmonitor-backend --tail=50
+          echo "📋 Final backend logs:"
+          docker logs bcmonitor-backend --tail=100
           exit 1
