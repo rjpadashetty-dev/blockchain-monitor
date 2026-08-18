@@ -230,3 +230,33 @@ jobs:
           docker inspect bcmonitor-backend 2>&1 || true
           
           exit 1
+      
+      - name: Report pipeline metrics
+        if: always()
+        run: |
+          # Determine overall pipeline status
+          if [ "${{ job.status }}" == "success" ]; then
+            PIPELINE_STATUS="passed"
+          else
+            PIPELINE_STATUS="failed"
+          fi
+          
+          echo "📊 Reporting pipeline metrics..."
+          echo "Status: $PIPELINE_STATUS"
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Author: ${{ github.actor }}"
+          echo "Build Number: ${{ github.run_number }}"
+          
+          # Try to send metrics to backend (use || true to not fail if backend not accessible)
+          curl -X POST http://localhost:5000/api/admin/pipeline-status \
+            -H "Content-Type: application/json" \
+            -d '{
+              "workflow": "CI/CD Pipeline",
+              "status": "'$PIPELINE_STATUS'",
+              "commit": "'${{ github.sha }}'",
+              "branch": "'${{ github.ref_name }}'",
+              "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+              "buildNumber": '${{ github.run_number }}',
+              "author": "'${{ github.actor }}'"
+            }' -v || echo "⚠️ Backend not accessible (may not be running)"
