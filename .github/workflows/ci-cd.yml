@@ -123,25 +123,56 @@ jobs:
       
       - name: Pull and run production images
         run: |
+          # Pull images
           docker pull ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           docker pull ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           
-          docker compose -f docker-compose.prod.yml down --remove-orphans || true
-          BACKEND_IMAGE=${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }} \
-          FRONTEND_IMAGE=${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }} \
-          BACKEND_TAG=${{ github.sha }} \
-          FRONTEND_TAG=${{ github.sha }} \
-          docker compose -f docker-compose.prod.yml up -d
-          sleep 20
+          # Stop any running containers
+          docker stop bcmonitor-backend bcmonitor-frontend || true
+          docker rm bcmonitor-backend bcmonitor-frontend || true
+          
+          # Create network
+          docker network create bcmonitor-net || true
+          
+          # Run backend
+          docker run -d \
+            --name bcmonitor-backend \
+            --network bcmonitor-net \
+            -p 5000:5000 \
+            -e PORT=5000 \
+            -e NODE_ENV=production \
+            -e JWT_SECRET=blockchain-monitor-secret-change-in-production \
+            -e FRONTEND_URL=http://localhost:3000 \
+            --restart unless-stopped \
+            ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          
+          # Wait for backend to start
+          sleep 15
+          
+          # Run frontend
+          docker run -d \
+            --name bcmonitor-frontend \
+            --network bcmonitor-net \
+            -p 3000:3000 \
+            -e BACKEND_URL=http://bcmonitor-backend:5000/api \
+            -e PORT=3000 \
+            -e NODE_ENV=production \
+            --restart unless-stopped \
+            ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          
+          sleep 10
       
       - name: Health check
         run: |
           for i in {1..20}; do
-            curl -fsS http://localhost:5000/api/health && exit 0
-            echo "Waiting for backend..."
+            if curl -fsS http://localhost:5000/api/health; then
+              echo "✅ Backend is healthy"
+              exit 0
+            fi
+            echo "⏳ Attempt $i - Waiting for backend..."
             sleep 3
           done
-          echo "Backend health check failed"
+          echo "❌ Backend health check failed"
           docker ps -a
-          docker compose -f docker-compose.prod.yml logs backend --tail=50
+          docker logs bcmonitor-backend --tail=50
           exit 1
