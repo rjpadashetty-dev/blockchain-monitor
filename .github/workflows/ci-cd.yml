@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
 env:
   REGISTRY: ghcr.io
   BACKEND_IMAGE: ${{ github.repository }}/bcmonitor-backend
@@ -70,30 +75,38 @@ jobs:
   security-scan:
     needs: build-and-push
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     steps:
       - name: Run Trivy vulnerability scanner on backend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-backend.sarif'
       
       - name: Run Trivy vulnerability scanner on frontend
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-frontend.sarif'
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-backend.sarif'
+          category: 'trivy-backend'
       
       - name: Upload Trivy frontend results
-        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-frontend.sarif'
+          category: 'trivy-frontend'
 
   deploy-staging:
     needs: security-scan
