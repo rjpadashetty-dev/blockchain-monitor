@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BlockChain Security Monitor</title>
+<title>TranzSafely | Smart Blockchain Security and Monitoring</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -46,24 +46,42 @@ body::before {
 
 /* ─────────────────────── LOGIN PAGE ─────────────────────── */
 #login-page {
-  position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:100;
-  background:radial-gradient(ellipse at center, #0d1f3c 0%, #060b14 70%);
+  position:fixed; inset:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,460px); align-items:center; gap:clamp(48px,8vw,140px); padding:clamp(28px,6vw,96px); z-index:100;
+  background:radial-gradient(ellipse at 18% 50%, #102c4c 0%, #091426 34%, #060b14 72%);
 }
+.login-intro { max-width:620px; padding-left:clamp(0px,4vw,64px); animation:loginReveal 0.6s ease 0.18s both; }
+.login-intro .eyebrow { display:flex; align-items:center; gap:10px; color:var(--primary); font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; margin-bottom:22px; }
+.login-intro .eyebrow::before { content:''; width:34px; height:1px; background:var(--primary); box-shadow:0 0 12px rgba(0,212,255,0.7); }
+.login-intro h2 { max-width:560px; font-size:clamp(34px,4.8vw,68px); line-height:0.98; letter-spacing:-2px; font-weight:700; color:var(--text); }
+.login-intro h2 strong { color:var(--primary); font-weight:700; }
+.login-intro p { max-width:500px; margin-top:22px; color:var(--text2); font-size:15px; line-height:1.7; }
+.login-intro .signal-row { display:flex; flex-wrap:wrap; gap:10px; margin-top:30px; }
+.signal-chip { padding:8px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(15,26,46,0.7); color:var(--text2); font-family:var(--mono); font-size:10px; }
+.signal-chip::first-letter { color:var(--primary); }
 .login-box {
-  background:var(--card); border:1px solid var(--border2); border-radius:20px; padding:48px 40px;
-  width:420px; max-width:95vw; position:relative; overflow:hidden;
+  background:rgba(15,26,46,0.94); border:1px solid var(--border2); border-radius:18px; padding:42px 40px;
+  width:100%; max-width:460px; position:relative; overflow:hidden;
   box-shadow: 0 0 80px rgba(0,212,255,0.08), 0 25px 50px rgba(0,0,0,0.5);
   animation: fadeSlideUp 0.6s ease;
+}
+.login-box::after {
+  content:''; position:absolute; left:18%; right:18%; top:92px; height:1px;
+  background:linear-gradient(90deg, transparent, rgba(0,212,255,0.8), transparent);
+  opacity:0; animation:scanLine 0.8s ease 0.1s both;
 }
 .login-box::before {
   content:''; position:absolute; top:0; left:0; right:0; height:2px;
   background:linear-gradient(90deg, transparent, var(--primary), var(--accent2), transparent);
 }
-.login-logo { text-align:center; margin-bottom:32px; }
-.login-logo .icon { font-size:48px; display:block; margin-bottom:8px; }
+.login-logo { text-align:center; margin-bottom:32px; animation:loginReveal 0.55s ease 0.12s both; }
+.login-logo .logo-mark { position:relative; width:72px; height:72px; margin:0 auto 16px; border:1px solid rgba(0,212,255,0.45); border-radius:18px; background:linear-gradient(145deg,rgba(0,212,255,0.16),rgba(124,58,237,0.18)); box-shadow:0 0 28px rgba(0,212,255,0.16), inset 0 0 24px rgba(0,212,255,0.06); animation:iconReveal 0.65s cubic-bezier(0.2,0.8,0.2,1) both; }
+.logo-mark .coin { position:absolute; left:11px; top:12px; width:28px; height:28px; display:grid; place-items:center; border-radius:50%; background:#fbbf24; color:#3b2500; font-family:var(--mono); font-size:17px; font-weight:700; box-shadow:0 0 16px rgba(251,191,36,0.45); }
+.logo-mark .transfer { position:absolute; right:8px; top:17px; color:var(--primary); font-size:23px; font-weight:700; line-height:1; text-shadow:0 0 12px rgba(0,212,255,0.75); }
+.logo-mark .shield { position:absolute; left:25px; bottom:8px; width:25px; height:25px; display:grid; place-items:center; border:2px solid #34d399; border-radius:7px 7px 11px 11px; color:#34d399; font-family:var(--mono); font-size:12px; font-weight:700; background:var(--bg2); }
+.logo-mark .alert { position:absolute; right:7px; bottom:7px; width:18px; height:18px; display:grid; place-items:center; border-radius:50%; background:#fb7185; color:#3f0710; font-size:12px; font-weight:800; box-shadow:0 0 12px rgba(251,113,133,0.55); }
 .login-logo h1 { font-size:22px; font-weight:700; color:var(--primary); letter-spacing:-0.5px; }
 .login-logo p { font-size:12px; color:var(--text3); margin-top:4px; font-family:var(--mono); }
-.login-tabs { display:flex; background:var(--bg2); border-radius:10px; padding:4px; margin-bottom:28px; gap:4px; }
+.login-tabs { display:flex; background:var(--bg2); border-radius:10px; padding:4px; margin-bottom:28px; gap:4px; animation:loginReveal 0.5s ease 0.42s both; }
 .tab-btn { flex:1; padding:10px; border:none; background:transparent; color:var(--text2); font-family:var(--font); font-size:14px; font-weight:500; border-radius:7px; cursor:pointer; transition:all 0.2s; }
 .tab-btn.active { background:var(--primary); color:#000; font-weight:600; }
 .form-group { margin-bottom:18px; }
@@ -266,9 +284,20 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .pipeline-indicator.running { background:#fbbf24; box-shadow:0 0 0 3px rgba(251,191,36,0.12); }
 
 @keyframes fadeSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+@keyframes iconReveal { 0% { opacity:0; transform:scale(0.65) rotate(-8deg); } 65% { opacity:1; transform:scale(1.08) rotate(2deg); } 100% { opacity:1; transform:scale(1) rotate(0); } }
+@keyframes loginReveal { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+@keyframes scanLine { 0% { opacity:0; transform:translateY(-20px) scaleX(0.4); } 35% { opacity:0.9; } 100% { opacity:0; transform:translateY(44px) scaleX(1); } }
 @keyframes slideInRight { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
 @keyframes spin { to { transform:rotate(360deg); } }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+@media (prefers-reduced-motion: reduce) {
+  .login-box, .login-box::after, .login-logo, .login-logo .icon, .login-tabs { animation:none; }
+}
+@media(max-width:820px) {
+  #login-page { display:flex; padding:24px; overflow-y:auto; }
+  .login-intro { display:none; }
+  .login-box { max-width:460px; margin:auto; }
+}
 
 .empty-state { text-align:center; padding:40px; color:var(--text3); }
 .empty-state .ico { font-size:40px; margin-bottom:12px; opacity:0.4; }
@@ -280,11 +309,17 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 
 <!-- ═══════════════════ LOGIN PAGE ═══════════════════ -->
 <div id="login-page">
+<div class="login-intro">
+  <div class="eyebrow">Blockchain intelligence platform</div>
+  <h2>Move value with <strong>confidence.</strong></h2>
+  <p>TranzSafely watches transactions, detects anomalies, and keeps your security and delivery signals in one clear view.</p>
+  <div class="signal-row"><span class="signal-chip">↔ TRANSFERS</span><span class="signal-chip">$ RISK SCORING</span><span class="signal-chip">! LIVE ALERTS</span></div>
+</div>
 <div class="login-box">
   <div class="login-logo">
-    <span class="icon">🔐</span>
-    <h1>BlockChain Security Monitor</h1>
-    <p>HKE Society's PDA College of Engineering</p>
+    <div class="logo-mark" aria-label="TranzSafely security and transfer mark"><span class="coin">$</span><span class="transfer">↔</span><span class="shield">✓</span><span class="alert">!</span></div>
+    <h1>TranzSafely</h1>
+    <p>Smart Blockchain Security and Monitoring</p>
   </div>
   <div class="login-tabs">
     <button class="tab-btn active" onclick="setLoginTab('user')">👤 User Portal</button>
@@ -310,7 +345,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 <div id="app">
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <h2>🔐 BCMonitor</h2>
+    <h2>🔐 TranzSafely</h2>
     <span id="sb-version">v1.0.0 · DevOps Build</span>
   </div>
   <div class="sidebar-user">
