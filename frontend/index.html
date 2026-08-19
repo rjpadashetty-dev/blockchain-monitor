@@ -256,9 +256,14 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 /* Devops info bar */
 .devops-bar { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
 .devops-pill { display:flex; align-items:center; gap:6px; padding:6px 14px; background:var(--card); border:1px solid var(--border); border-radius:20px; font-size:11px; font-family:var(--mono); color:var(--text3); }
-.devops-pill .dot { width:6px; height:6px; border-radius:50%; background:var(--green); animation:pulse 2s infinite; }
-.devops-pill .dot.red { background:var(--red); }
-.devops-pill .dot.yellow { background:var(--yellow); }
+.devops-pill .dot { width:6px; height:6px; border-radius:50%; background:#64748b; box-shadow:0 0 0 2px rgba(100,116,139,0.12); animation:pulse 2s ease-in-out infinite; }
+.devops-pill.active .dot { background:#34d399; box-shadow:0 0 0 2px rgba(52,211,153,0.12); animation:pulse 1.4s ease-in-out infinite; }
+.devops-pill.failed .dot { background:#fb7185; box-shadow:0 0 0 2px rgba(251,113,133,0.12); animation:pulse 1.4s ease-in-out infinite; }
+.devops-pill.pending .dot { background:#fbbf24; box-shadow:0 0 0 2px rgba(251,191,36,0.12); animation:pulse 1.4s ease-in-out infinite; }
+.pipeline-indicator { width:12px; height:12px; flex:0 0 12px; border-radius:50%; animation:pulse 1.6s ease-in-out infinite; }
+.pipeline-indicator.passed { background:#34d399; box-shadow:0 0 0 3px rgba(52,211,153,0.12); }
+.pipeline-indicator.failed { background:#fb7185; box-shadow:0 0 0 3px rgba(251,113,133,0.12); }
+.pipeline-indicator.running { background:#fbbf24; box-shadow:0 0 0 3px rgba(251,191,36,0.12); }
 
 @keyframes fadeSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
 @keyframes slideInRight { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
@@ -434,7 +439,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <div class="page" id="page-admin-overview">
     <div class="page-header"><h1>Admin Overview</h1><p>System-wide blockchain monitoring dashboard</p></div>
     <div class="devops-bar">
-      <div class="devops-pill"><div class="dot"></div>CI/CD: Jenkins Active</div>
+      <div class="devops-pill"><div class="dot"></div>CI/CD: GitHub Actions</div>
       <div class="devops-pill"><div class="dot"></div>Docker: 3 containers</div>
       <div class="devops-pill"><div class="dot"></div>Prometheus: Scraping</div>
       <div class="devops-pill"><div class="dot yellow"></div>Alerts: <span id="devops-alert-count">--</span> unresolved</div>
@@ -520,10 +525,9 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <div class="page" id="page-admin-cicd">
     <div class="page-header"><h1>CI/CD Pipeline Monitoring</h1><p>Continuous integration and deployment pipeline status</p></div>
     <div class="devops-bar">
-      <div class="devops-pill"><div class="dot"></div>Jenkins: Running</div>
-      <div class="devops-pill"><div class="dot"></div>GitHub Actions: Active</div>
-      <div class="devops-pill"><div class="dot"></div>Docker: Building</div>
-      <div class="devops-pill"><div class="dot yellow"></div>Tests: 2 failing</div>
+      <div class="devops-pill" id="github-actions-status"><div class="dot"></div>GitHub Actions: Waiting</div>
+      <div class="devops-pill" id="docker-status"><div class="dot"></div>Docker: Waiting</div>
+      <div class="devops-pill" id="tests-status"><div class="dot"></div>Tests: No failures</div>
     </div>
     <div class="stats-grid" id="cicd-stats"></div>
     <div class="grid-2">
@@ -1343,13 +1347,39 @@ async function loadAdminCICD() {
 
   // Recent builds from pipeline-status endpoint
   const builds = data.recentBuilds || [];
+  const latestBuild = builds[0];
+  const dockerBuild = builds.find(b => /docker|build-and-push/i.test(b.workflow || ''));
+  const failedTests = builds.filter(b => /test|security/i.test(b.workflow || '') && b.status === 'failed').length;
+  const setDevopsStatus = (id, label, status) => {
+    const element = document.getElementById(id);
+    if (!element) return;
+    element.className = `devops-pill ${status}`;
+    element.innerHTML = `<div class="dot"></div>${label}`;
+  };
+
+  setDevopsStatus(
+    'github-actions-status',
+    `GitHub Actions: ${latestBuild ? latestBuild.status.toUpperCase() : 'Waiting'}`,
+    latestBuild?.status === 'failed' ? 'failed' : latestBuild ? 'active' : ''
+  );
+  setDevopsStatus(
+    'docker-status',
+    `Docker: ${dockerBuild ? dockerBuild.status.toUpperCase() : 'Waiting'}`,
+    dockerBuild?.status === 'failed' ? 'failed' : dockerBuild ? 'active' : ''
+  );
+  setDevopsStatus(
+    'tests-status',
+    `Tests: ${failedTests ? `${failedTests} failing` : 'Passing'}`,
+    failedTests ? 'failed' : builds.length ? 'active' : ''
+  );
+
   document.getElementById('pipeline-status').innerHTML = builds.length > 0 ? builds.map(b => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:12px;height:12px;border-radius:50%;background:${b.status === 'passed' ? 'var(--green)' : b.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}"></div>
+        <div class="pipeline-indicator ${b.status === 'passed' ? 'passed' : b.status === 'failed' ? 'failed' : 'running'}"></div>
         <div>
           <div style="font-weight:600;font-size:14px">${b.workflow}</div>
-          <div style="font-size:11px;color:var(--text3)">${b.branch} · ${b.commit.slice(0,8)}</div>
+          <div style="font-size:11px;color:var(--text3)">${b.branch} · ${(b.commit || 'unknown').slice(0,8)}</div>
         </div>
       </div>
       <div style="text-align:right">
@@ -1373,8 +1403,19 @@ async function loadAdminCICD() {
     </div>
   `).join('') : '<div style="padding:10px;color:var(--text3)">No builds found</div>';
 
-  // Show deployment history placeholder if no data
-  document.getElementById('deployment-history').innerHTML = `<div style="padding:20px;text-align:center;color:var(--text3)">CI/CD pipeline metrics will appear here. Backend is running on port 5000.</div>`;
+  const deployments = builds.filter(b => /deploy|production/i.test(b.workflow || ''));
+  document.getElementById('deployment-history').innerHTML = deployments.length > 0 ? deployments.map(b => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:600">${b.workflow}</div>
+        <div style="font-size:11px;color:var(--text3)">${b.branch} · Build #${b.buildNumber || '—'} · ${b.author || 'system'}</div>
+      </div>
+      <div style="text-align:right">
+        <span class="badge ${b.status === 'passed' ? 'success' : b.status === 'failed' ? 'danger' : 'pending'}">${b.status}</span>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${fmtDate(b.timestamp)}</div>
+      </div>
+    </div>
+  `).join('') : '<div style="padding:20px;text-align:center;color:var(--text3)">No deployment run has been reported yet.</div>';
 }
 
 // ─────────────────── MOCK DATA ────────────────────────────
