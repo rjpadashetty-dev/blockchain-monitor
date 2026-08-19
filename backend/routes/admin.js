@@ -287,8 +287,29 @@ function buildProjectCICDData() {
   };
 }
 
-// All admin routes require authentication + admin role
-router.use(authenticateToken, requireAdmin);
+function authenticatePipelineReporter(req, res, next) {
+  const expectedToken = process.env.CICD_METRICS_TOKEN;
+  const providedToken = req.headers['x-cicd-token'];
+
+  if (!expectedToken) {
+    return res.status(503).json({ error: 'CI/CD metrics reporting is not configured' });
+  }
+
+  if (!providedToken || providedToken !== expectedToken) {
+    return res.status(401).json({ error: 'Invalid CI/CD metrics token' });
+  }
+
+  next();
+}
+
+// GitHub Actions may submit pipeline metrics with the dedicated token.
+router.use((req, res, next) => {
+  if (req.method === 'POST' && req.path === '/pipeline-status') {
+    return authenticatePipelineReporter(req, res, next);
+  }
+
+  return authenticateToken(req, res, () => requireAdmin(req, res, next));
+});
 
 // ─── GET /api/admin/overview ──────────────────────────────────────────────────
 router.get('/overview', (req, res) => {

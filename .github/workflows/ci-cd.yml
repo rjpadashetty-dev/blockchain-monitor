@@ -72,6 +72,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Report Docker image build metrics
+        if: always()
+        env:
+          CICD_METRICS_URL: ${{ secrets.CICD_METRICS_URL }}
+          CICD_METRICS_TOKEN: ${{ secrets.CICD_METRICS_TOKEN }}
+        run: |
+          if [ -z "$CICD_METRICS_URL" ] || [ -z "$CICD_METRICS_TOKEN" ]; then
+            echo "CI/CD metrics secrets are not configured; skipping report"
+            exit 0
+          fi
+
+          if [ "${{ job.status }}" = "success" ]; then
+            PIPELINE_STATUS="passed"
+          else
+            PIPELINE_STATUS="failed"
+          fi
+
+          curl --fail-with-body -X POST "${CICD_METRICS_URL%/}/api/admin/pipeline-status" \
+            -H "Content-Type: application/json" \
+            -H "X-CICD-Token: $CICD_METRICS_TOKEN" \
+            -d "{\"workflow\":\"Docker Images\",\"status\":\"$PIPELINE_STATUS\",\"commit\":\"${{ github.sha }}\",\"branch\":\"${{ github.ref_name }}\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"buildNumber\":${{ github.run_number }},\"author\":\"${{ github.actor }}\"}" \
+            || echo "Warning: Docker image metrics report failed"
+
   security-scan:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -248,15 +271,21 @@ jobs:
           echo "Author: ${{ github.actor }}"
           echo "Build Number: ${{ github.run_number }}"
           
-          # Try to send metrics to backend (use || true to not fail if backend not accessible)
-          curl -X POST http://localhost:5000/api/admin/pipeline-status \
+          # Report to the deployed backend without failing the deployment if metrics are unavailable.
+          if [ -z "${{ secrets.CICD_METRICS_URL }}" ] || [ -z "${{ secrets.CICD_METRICS_TOKEN }}" ]; then
+            echo "CI/CD metrics secrets are not configured; skipping report"
+            exit 0
+          fi
+
+          curl --fail-with-body -X POST "${{ secrets.CICD_METRICS_URL }}/api/admin/pipeline-status" \
             -H "Content-Type: application/json" \
+            -H "X-CICD-Token: ${{ secrets.CICD_METRICS_TOKEN }}" \
             -d '{
-              "workflow": "CI/CD Pipeline",
+              "workflow": "Production Deployment",
               "status": "'$PIPELINE_STATUS'",
               "commit": "'${{ github.sha }}'",
               "branch": "'${{ github.ref_name }}'",
               "timestamp": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
               "buildNumber": '${{ github.run_number }}',
               "author": "'${{ github.actor }}'"
-            }' -v || echo "⚠️ Backend not accessible (may not be running)"
+            }' -v || echo "Warning: production deployment metrics report failed"

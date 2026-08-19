@@ -657,7 +657,7 @@ let authToken = null;
 let currentLoginTab = 'user';
 
 // ─── DEMO MODE: If backend not running, use mock data ─────
-const DEMO_MODE = false; // Set to false when backend is running
+const DEMO_MODE = false; // Set to true for testing with mock data
 
 // ─────────────────── AUTH ─────────────────────────────────
 function setLoginTab(tab) {
@@ -1324,64 +1324,57 @@ async function loadAdminCICD() {
   if (DEMO_MODE) {
     data = getMockCICDData();
   } else {
-    data = await apiFetch('/admin/cicd');
+    // Use new pipeline-status endpoint
+    data = await apiFetch('/admin/pipeline-status');
     if (!data) { data = getMockCICDData(); }
   }
 
   const s = data.stats;
 
+  // Parse success rate from string (e.g., "100%" → "100")
+  const successRate = typeof s.successRate === 'string' ? s.successRate.replace('%', '') : s.successRate;
+
   document.getElementById('cicd-stats').innerHTML = `
-    <div class="stat-card green"><div class="ico">⚙</div><div class="label">Active Pipelines</div><div class="value">${s.activePipelines}</div><div class="change">Running builds</div></div>
-    <div class="stat-card blue"><div class="ico">✓</div><div class="label">Successful Builds</div><div class="value">${s.successfulBuilds}</div><div class="change">Last 24h</div></div>
-    <div class="stat-card red"><div class="ico">✗</div><div class="label">Failed Builds</div><div class="value">${s.failedBuilds}</div><div class="change">Needs attention</div></div>
-    <div class="stat-card yellow"><div class="ico">⏱</div><div class="label">Avg Build Time</div><div class="value">${s.avgBuildTime}m</div><div class="change">Target: 15m</div></div>
+    <div class="stat-card green"><div class="ico">⚙</div><div class="label">Total Pipelines</div><div class="value">${s.totalPipelines || 0}</div><div class="change">All time</div></div>
+    <div class="stat-card blue"><div class="ico">✓</div><div class="label">Successful</div><div class="value">${s.passedPipelines || 0}</div><div class="change">Passed runs</div></div>
+    <div class="stat-card red"><div class="ico">✗</div><div class="label">Failed</div><div class="value">${s.failedPipelines || 0}</div><div class="change">Failed runs</div></div>
+    <div class="stat-card yellow"><div class="ico">📊</div><div class="label">Success Rate</div><div class="value">${successRate}%</div><div class="change">Overall</div></div>
   `;
 
-  // Pipeline status
-  const pipelines = data.pipelines;
-  document.getElementById('pipeline-status').innerHTML = pipelines.map(p => `
+  // Recent builds from pipeline-status endpoint
+  const builds = data.recentBuilds || [];
+  document.getElementById('pipeline-status').innerHTML = builds.length > 0 ? builds.map(b => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:12px;height:12px;border-radius:50%;background:${p.status === 'running' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}"></div>
+        <div style="width:12px;height:12px;border-radius:50%;background:${b.status === 'passed' ? 'var(--green)' : b.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}"></div>
         <div>
-          <div style="font-weight:600;font-size:14px">${p.name}</div>
-          <div style="font-size:11px;color:var(--text3)">${p.branch} · ${p.commit.slice(0,8)}</div>
+          <div style="font-weight:600;font-size:14px">${b.workflow}</div>
+          <div style="font-size:11px;color:var(--text3)">${b.branch} · ${b.commit.slice(0,8)}</div>
         </div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:12px;color:${p.status === 'running' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}">${p.status.toUpperCase()}</div>
-        <div style="font-size:10px;color:var(--text3)">${p.duration || '—'}</div>
+        <div style="font-size:12px;color:${b.status === 'passed' ? 'var(--green)' : b.status === 'failed' ? 'var(--red)' : 'var(--yellow)'}">${b.status.toUpperCase()}</div>
+        <div style="font-size:10px;color:var(--text3)">${fmtDate(b.timestamp)}</div>
       </div>
     </div>
-  `).join('');
+  `).join('') : '<div style="padding:20px;text-align:center;color:var(--text3)">No pipeline data yet. Run a workflow to generate metrics.</div>';
 
-  // Recent builds
-  const builds = data.recentBuilds;
-  document.getElementById('recent-builds').innerHTML = builds.map(b => `
+  // Detailed builds table
+  document.getElementById('recent-builds').innerHTML = builds.length > 0 ? builds.map((b, idx) => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border-bottom:1px solid var(--border)">
       <div>
-        <div style="font-size:13px;font-weight:500">${b.project}</div>
-        <div style="font-size:11px;color:var(--text3)">Build #${b.buildNumber} · ${b.trigger}</div>
+        <div style="font-size:13px;font-weight:500">${b.workflow}</div>
+        <div style="font-size:11px;color:var(--text3)">Build #${b.buildNumber || idx+1} by ${b.author}</div>
       </div>
       <div style="text-align:right">
-        <span class="badge ${b.status}">${b.status}</span>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px">${b.duration}</div>
+        <span class="badge ${b.status === 'passed' ? 'success' : 'danger'}">${b.status}</span>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${fmtDate(b.timestamp)}</div>
       </div>
     </div>
-  `).join('');
+  `).join('') : '<div style="padding:10px;color:var(--text3)">No builds found</div>';
 
-  // Deployment history
-  const deployments = data.deployments;
-  document.getElementById('deployment-history').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Service</th><th>Version</th><th>Environment</th><th>Status</th><th>Deployed By</th><th>Time</th></tr></thead><tbody>
-    ${deployments.map(d => `<tr>
-      <td>${d.service}</td>
-      <td class="mono">${d.version}</td>
-      <td><span class="badge ${d.environment === 'production' ? 'critical' : 'medium'}">${d.environment}</span></td>
-      <td><span class="badge ${d.status}">${d.status}</span></td>
-      <td>${d.deployedBy}</td>
-      <td class="mono">${fmtDate(d.timestamp)}</td>
-    </tr>`).join('')}
-  </tbody></table></div>`;
+  // Show deployment history placeholder if no data
+  document.getElementById('deployment-history').innerHTML = `<div style="padding:20px;text-align:center;color:var(--text3)">CI/CD pipeline metrics will appear here. Backend is running on port 5000.</div>`;
 }
 
 // ─────────────────── MOCK DATA ────────────────────────────
