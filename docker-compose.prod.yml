@@ -13,8 +13,10 @@ services:
       - NODE_ENV=production
       - JWT_SECRET=${JWT_SECRET:-blockchain-monitor-secret-change-in-production}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-    volumes:
-      - backend-db:/app/db.json
+      - DATABASE_URL=${DATABASE_URL}
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - BLOCKCHAIN_MODE=${BLOCKCHAIN_MODE:-readonly}
+      - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
     networks:
       - bcmonitor-net
     healthcheck:
@@ -61,5 +63,4 @@ networks:
     driver: bridge
 
 volumes:
-  backend-db:
   prometheus-data:

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TranzSafely | Smart Blockchain Security and Monitoring</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 <style>
 :root {
   --bg: #060b14;
@@ -211,6 +212,12 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--primary); }
 .field select option { background:var(--bg2); }
 .field textarea { min-height:80px; resize:vertical; }
+.password-wrap { position:relative; }
+.password-wrap input { padding-right:42px; }
+.password-toggle { position:absolute; right:8px; top:50%; transform:translateY(-50%); border:0; background:transparent; color:var(--text3); cursor:pointer; font-size:16px; padding:4px; }
+.recipient-card { margin-top:12px; padding:12px; border:1px solid rgba(0,212,255,0.35); border-radius:10px; background:rgba(0,212,255,0.06); }
+.help-option { display:flex; align-items:center; gap:10px; padding:12px; border:1px solid var(--border); border-radius:8px; margin-bottom:8px; cursor:pointer; }
+.help-option:hover { border-color:var(--primary); background:rgba(0,212,255,0.05); }
 
 /* Alert cards */
 .alert-card { border-radius:10px; padding:16px; margin-bottom:12px; border:1px solid; display:flex; gap:14px; align-items:flex-start; }
@@ -331,7 +338,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   </div>
   <div class="form-group">
     <label>Password</label>
-    <input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password" onkeypress="if(event.key==='Enter')doLogin()">
+    <div class="password-wrap"><input type="password" id="login-password" placeholder="Enter password" autocomplete="current-password" onkeypress="if(event.key==='Enter')doLogin()"><button type="button" class="password-toggle" onclick="togglePassword('login-password', this)" aria-label="Show password">◉</button></div>
   </div>
   <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
   <div class="error-msg" id="login-error"></div>
@@ -416,12 +423,14 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <div class="card">
         <div class="balance-label">Available Balance</div>
         <div class="balance-big" id="transfer-balance">₹0.00</div>
+        <div id="transfer-policy" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
         <div style="margin-top:20px;margin-bottom:20px;height:1px;background:var(--border)"></div>
         <div class="form-row">
           <div class="field">
-            <label>Recipient Username / Wallet</label>
-            <input id="tx-to" type="text" placeholder="e.g. rajesh or 0x..." oninput="searchRecipient(this.value)">
+            <label>Search Recipient ID, Name, Phone, Username</label>
+            <input id="tx-to" type="text" placeholder="e.g. rajesh-482731 or phone number" oninput="searchRecipient(this.value)">
             <div id="recipient-suggestions" style="position:relative"></div>
+            <div id="selected-recipient"></div>
           </div>
         </div>
         <div class="form-row">
@@ -467,6 +476,22 @@ tr:hover td { background:rgba(255,255,255,0.02); }
         </table>
       </div>
       <div class="pagination" id="history-pagination"></div>
+    </div>
+  </div>
+
+  <div class="page" id="page-help">
+    <div class="page-header"><h1>Help & Support</h1><p>Send a problem directly to the security team</p></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h3>What happened?</h3></div>
+        <label class="help-option"><input type="radio" name="help-category" value="id_blocked"> My ID is blocked</label>
+        <label class="help-option"><input type="radio" name="help-category" value="transaction_failure"> Transaction failed</label>
+        <label class="help-option"><input type="radio" name="help-category" value="unidentified_transaction"> I do not recognize a transaction</label>
+        <label class="help-option"><input type="radio" name="help-category" value="other"> Other problem</label>
+        <div class="field" style="margin-top:14px"><label>Message</label><textarea id="help-message" placeholder="Describe the problem..."></textarea></div>
+        <button class="btn btn-primary" onclick="submitHelpRequest()">Send to Admin</button>
+      </div>
+      <div class="card"><div class="card-header"><h3>My Support Requests</h3></div><div id="my-help-requests"></div></div>
     </div>
   </div>
 
@@ -549,7 +574,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>User</th><th>Email</th><th>Wallet</th><th>Balance</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+          <thead><tr><th>User / Public ID</th><th>Phone</th><th>Balance</th><th>Transfer Policy</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="admin-users-tbody"></tbody>
         </table>
       </div>
@@ -579,6 +604,18 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <div class="card-header"><h3>Deployment History</h3></div>
       <div id="deployment-history"></div>
     </div>
+  </div>
+
+  <div class="page" id="page-admin-help">
+    <div class="page-header"><h1>Support & Notifications</h1><p>Review user problems and operational information</p></div>
+    <div class="card"><div class="card-header"><h3>User Help Requests</h3><select id="help-filter" onchange="loadAdminHelp()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text)"><option value="open">Open</option><option value="resolved">Resolved</option><option value="">All</option></select></div><div id="admin-help-list"></div></div>
+    <div class="card"><div class="card-header"><h3>System Notifications</h3></div><div id="admin-notifications"></div></div>
+  </div>
+
+  <div class="page" id="page-admin-governance">
+    <div class="page-header"><h1>Governance & Intelligence</h1><p>Review audit history and monitor blockchain addresses</p></div>
+    <div class="card"><div class="card-header"><h3>Watched Blockchain Addresses</h3></div><div class="form-row"><div class="field"><label>Address</label><input id="watch-address" placeholder="0x..."></div><div class="field"><label>Risk level</label><select id="watch-level"><option value="high">High</option><option value="critical">Critical</option><option value="medium">Medium</option></select></div><div class="field"><label>Reason</label><input id="watch-reason" placeholder="Known scam address"></div></div><button class="btn btn-primary" onclick="addWatchedAddress()">Add to Watchlist</button><div id="watched-addresses" style="margin-top:16px"></div></div>
+    <div class="card"><div class="card-header"><h3>Complete Audit Trail</h3></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead><tbody id="audit-tbody"></tbody></table></div></div>
   </div>
 </main>
 </div>
@@ -636,8 +673,9 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   </div>
   <div class="form-row">
     <div class="field"><label>Balance (₹)</label><input id="eu-balance" type="number" step="0.01"></div>
-    <div class="field"><label>New Password (leave blank to keep)</label><input id="eu-password" type="password" placeholder="New password"></div>
+    <div class="field"><label>New Password (leave blank to keep)</label><div class="password-wrap"><input id="eu-password" type="password" placeholder="New password"><button type="button" class="password-toggle" onclick="togglePassword('eu-password', this)">◉</button></div></div>
   </div>
+  <div class="form-row"><div class="field"><label>Transfer access</label><select id="eu-transfer-blocked"><option value="false">Allowed</option><option value="true">Blocked</option></select></div><div class="field"><label>Daily limit (₹, blank = no limit)</label><input id="eu-daily-limit" type="number" min="0" step="0.01"></div><div class="field"><label>Monthly limit (₹, blank = no limit)</label><input id="eu-monthly-limit" type="number" min="0" step="0.01"></div></div>
   <div style="display:flex;gap:8px;margin-top:16px">
     <button class="btn btn-primary" onclick="submitEditUser()">Save Changes</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-edit-user')">Cancel</button>
@@ -694,6 +732,9 @@ const API_BASE = '__BACKEND_URL__';
 let currentUser = null;
 let authToken = null;
 let currentLoginTab = 'user';
+let recipientDirectory = {};
+let selectedRecipient = null;
+let realtimeSocket = null;
 
 // ─── DEMO MODE: If backend not running, use mock data ─────
 const DEMO_MODE = false; // Set to true for testing with mock data
@@ -792,11 +833,22 @@ function initApp() {
   document.getElementById('dash-name').textContent = currentUser.fullName.split(' ')[0];
 
   buildSidebar();
+  connectRealtime();
   if (currentUser.role === 'admin') {
     showPage('page-admin-overview');
   } else {
     showPage('page-dashboard');
   }
+}
+
+function connectRealtime() {
+  if (DEMO_MODE || typeof io !== 'function') return;
+  const socketBase = API_BASE.replace(/\/api\/?$/, '');
+  realtimeSocket = io(socketBase, { transports: ['websocket', 'polling'] });
+  realtimeSocket.on('security:high-risk-transaction', event => showToast('High-risk transaction detected', 'warning'));
+  realtimeSocket.on('cicd:pipeline-failed', event => showToast(`CI/CD failed: ${event.workflow || 'pipeline'}`, 'error'));
+  realtimeSocket.on('support:new-request', event => { if (currentUser?.role === 'admin') showToast('New user support request', 'warning'); });
+  realtimeSocket.on('service:down', event => showToast(`Service unavailable: ${event.service || 'monitoring'}`, 'error'));
 }
 
 function buildSidebar() {
@@ -809,6 +861,7 @@ function buildSidebar() {
     <div class="nav-item" onclick="showPage('page-profile')"><span class="ico">◎</span> My Profile</div>
     <div class="nav-item" onclick="showPage('page-transfer')"><span class="ico">⇄</span> Transfer Funds</div>
     <div class="nav-item" onclick="showPage('page-history')"><span class="ico">◈</span> Transaction History</div>
+    <div class="nav-item" onclick="showPage('page-help')"><span class="ico">?</span> Help & Support</div>
   `;
   const adminNav = `
     <div class="nav-section">Admin</div>
@@ -817,9 +870,12 @@ function buildSidebar() {
     <div class="nav-item" onclick="showPage('page-admin-alerts')"><span class="ico">⚠</span> Security Alerts <span class="nav-badge" id="alert-badge">!</span></div>
     <div class="nav-item" onclick="showPage('page-admin-users')"><span class="ico">◎</span> User Management</div>
     <div class="nav-item" onclick="showPage('page-admin-cicd')"><span class="ico">⚙</span> CI/CD Pipeline</div>
+    <div class="nav-item" onclick="showPage('page-admin-help')"><span class="ico">✉</span> Support & Notifications</div>
+    <div class="nav-item" onclick="showPage('page-admin-governance')"><span class="ico">◉</span> Governance & Intelligence</div>
   `;
 
   nav.innerHTML = isAdmin ? adminNav : userNav;
+  document.querySelector('.sidebar-footer').innerHTML = `${isAdmin ? '' : '<button class="btn-logout" style="margin-bottom:8px" onclick="showPage(\'page-help\')">? Help & Support</button>'}<button class="btn-logout" onclick="doLogout()">⬡ Sign Out</button>`;
 }
 
 function showPage(id) {
@@ -838,11 +894,14 @@ function showPage(id) {
     'page-profile': loadProfile,
     'page-transfer': loadTransferPage,
     'page-history': () => loadHistory(1),
+    'page-help': loadHelp,
     'page-admin-overview': loadAdminOverview,
     'page-admin-transactions': loadAllTx,
     'page-admin-alerts': loadAlerts,
     'page-admin-users': loadAdminUsers,
-    'page-admin-cicd': loadAdminCICD
+    'page-admin-cicd': loadAdminCICD,
+    'page-admin-help': loadAdminHelp,
+    'page-admin-governance': loadAdminGovernance
   };
   if (loaders[id]) loaders[id]();
 }
@@ -889,6 +948,7 @@ async function loadUserDashboard() {
   document.getElementById('user-account-info').innerHTML = `
     <div class="info-grid">
       <div class="info-item"><div class="info-label">Username</div><div class="info-value">${currentUser.username}</div></div>
+      <div class="info-item"><div class="info-label">Public User ID</div><div class="info-value mono">${currentUser.userCode || currentUser.username}</div></div>
       <div class="info-item"><div class="info-label">Email</div><div class="info-value">${currentUser.email}</div></div>
       <div class="info-item"><div class="info-label">Department</div><div class="info-value">${currentUser.department || '—'}</div></div>
       <div class="info-item"><div class="info-label">Account Status</div><div class="info-value"><span class="badge active">Active</span></div></div>
@@ -910,6 +970,7 @@ function renderProfileView() {
     <div class="info-grid">
       <div class="info-item"><div class="info-label">Full Name</div><div class="info-value">${currentUser.fullName}</div></div>
       <div class="info-item"><div class="info-label">Username</div><div class="info-value mono">${currentUser.username}</div></div>
+      <div class="info-item"><div class="info-label">Public User ID</div><div class="info-value mono">${currentUser.userCode || currentUser.username}</div></div>
       <div class="info-item"><div class="info-label">Email</div><div class="info-value">${currentUser.email}</div></div>
       <div class="info-item"><div class="info-label">Phone</div><div class="info-value">${currentUser.phone || '—'}</div></div>
       <div class="info-item"><div class="info-label">Department</div><div class="info-value">${currentUser.department || '—'}</div></div>
@@ -961,11 +1022,20 @@ async function changePassword() {
 // ─────────────────── TRANSFER ─────────────────────────────
 function loadTransferPage() {
   document.getElementById('transfer-balance').textContent = '₹' + fmt(currentUser.balance);
+  const limits = currentUser.transferLimits || {};
+  const limitText = currentUser.transferBlocked
+    ? 'Transfer access is currently blocked by an administrator.'
+    : `Daily limit: ${limits.daily == null ? 'No limit' : '₹' + fmt(limits.daily)} · Monthly limit: ${limits.monthly == null ? 'No limit' : '₹' + fmt(limits.monthly)}`;
+  const policy = document.getElementById('transfer-policy');
+  policy.textContent = limitText;
+  policy.style.color = currentUser.transferBlocked ? 'var(--red)' : 'var(--text3)';
 }
 
 let recipientTimeout = null;
 function searchRecipient(val) {
   clearTimeout(recipientTimeout);
+  selectedRecipient = null;
+  document.getElementById('selected-recipient').innerHTML = '';
   const el = document.getElementById('recipient-suggestions');
   if (val.length < 2) { el.innerHTML = ''; return; }
   recipientTimeout = setTimeout(async () => {
@@ -981,18 +1051,23 @@ function searchRecipient(val) {
       users = res || [];
     }
 
+    recipientDirectory = {};
+    users.forEach(u => { recipientDirectory[u.username] = u; });
     if (users.length === 0) { el.innerHTML = ''; return; }
     el.innerHTML = `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">
       ${users.map(u=>`<div onclick="selectRecipient('${u.username}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
-        <strong>${u.fullName}</strong> <span class="mono" style="color:var(--text3)">@${u.username}</span>
+        <strong>${u.fullName}</strong> <span class="mono" style="color:var(--text3)">${u.userCode || u.username} · ${u.phone || 'No phone'}</span>
       </div>`).join('')}
     </div>`;
   }, 300);
 }
 
 function selectRecipient(username) {
-  document.getElementById('tx-to').value = username;
+  const user = recipientDirectory[username];
+  selectedRecipient = user;
+  document.getElementById('tx-to').value = user.userCode || user.username;
   document.getElementById('recipient-suggestions').innerHTML = '';
+  document.getElementById('selected-recipient').innerHTML = `<div class="recipient-card"><strong>${user.fullName}</strong><div class="mono">ID: ${user.userCode || user.username} · Username: @${user.username} · Phone: ${user.phone || 'Not provided'}</div></div>`;
 }
 
 async function doTransfer() {
@@ -1000,7 +1075,7 @@ async function doTransfer() {
   const amount = parseFloat(document.getElementById('tx-amount').value);
   const note = document.getElementById('tx-note').value.trim();
 
-  if (!to) { showToast('Enter recipient username', 'error'); return; }
+  if (!to || !selectedRecipient || to !== (selectedRecipient.userCode || selectedRecipient.username)) { showToast('Search and select a recipient from the results', 'error'); return; }
   if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
   if (amount > currentUser.balance) { showToast('Insufficient balance', 'error'); return; }
   if (to === currentUser.username) { showToast('Cannot transfer to yourself', 'error'); return; }
@@ -1029,6 +1104,8 @@ async function doTransfer() {
   currentUser.balance = res.newBalance;
   document.getElementById('transfer-balance').textContent = '₹' + fmt(currentUser.balance);
   document.getElementById('tx-to').value = '';
+  selectedRecipient = null;
+  document.getElementById('selected-recipient').innerHTML = '';
   document.getElementById('tx-amount').value = '';
   document.getElementById('tx-note').value = '';
 
@@ -1235,21 +1312,20 @@ async function loadAdminUsers() {
     <tr>
       <td>
         <div style="font-weight:600">${u.fullName}</div>
-        <div class="mono" style="color:var(--text3)">@${u.username}</div>
+        <div class="mono" style="color:var(--primary)">${u.userCode || u.username}</div>
       </td>
-      <td>${u.email}</td>
-      <td><span class="mono truncate" style="font-size:10px;color:var(--text3)">${u.walletAddress.slice(0,18)}...</span></td>
+      <td>${u.phone || '—'}</td>
       <td class="mono" style="color:var(--primary)">₹${fmt(u.balance)}</td>
+      <td class="mono">${u.transferBlocked ? '<span class="badge suspended">Blocked</span>' : `Day: ${u.transferLimits?.daily == null ? '∞' : '₹'+fmt(u.transferLimits.daily)}<br>Month: ${u.transferLimits?.monthly == null ? '∞' : '₹'+fmt(u.transferLimits.monthly)}`}</td>
       <td><span class="badge ${u.role}">${u.role}</span></td>
       <td><span class="badge ${u.status}">${u.status}</span></td>
-      <td class="mono">${fmtDate(u.createdAt)}</td>
       <td>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick='openEditUserModal(${JSON.stringify(u)})'>Edit</button>
           ${u.id !== 'admin-001' ? `<button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="deleteUser('${u.id}','${u.fullName}')">Del</button>` : ''}
         </div>
       </td>
-    </tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><div class="ico">◎</div><p>No users found</p></div></td></tr>';
+    </tr>`).join('') || '<tr><td colspan="7"><div class="empty-state"><div class="ico">◎</div><p>No users found</p></div></td></tr>';
 }
 
 function openAddUserModal() { openModal('modal-add-user'); }
@@ -1303,6 +1379,9 @@ function openEditUserModal(u) {
   document.getElementById('eu-role').value = u.role;
   document.getElementById('eu-balance').value = u.balance;
   document.getElementById('eu-password').value = '';
+  document.getElementById('eu-transfer-blocked').value = String(Boolean(u.transferBlocked));
+  document.getElementById('eu-daily-limit').value = u.transferLimits?.daily ?? '';
+  document.getElementById('eu-monthly-limit').value = u.transferLimits?.monthly ?? '';
   openModal('modal-edit-user');
 }
 
@@ -1316,6 +1395,9 @@ async function submitEditUser() {
   const role = document.getElementById('eu-role').value;
   const balance = parseFloat(document.getElementById('eu-balance').value) || 0;
   const password = document.getElementById('eu-password').value;
+  const transferBlocked = document.getElementById('eu-transfer-blocked').value === 'true';
+  const dailyLimit = document.getElementById('eu-daily-limit').value;
+  const monthlyLimit = document.getElementById('eu-monthly-limit').value;
 
   if (DEMO_MODE) {
     const u = MOCK_DB.users.find(u=>u.id===id);
@@ -1327,13 +1409,15 @@ async function submitEditUser() {
     u.status = status;
     u.role = role;
     u.balance = balance;
+    u.transferBlocked = transferBlocked;
+    u.transferLimits = { daily: dailyLimit === '' ? null : parseFloat(dailyLimit), monthly: monthlyLimit === '' ? null : parseFloat(monthlyLimit) };
     closeModal('modal-edit-user');
     loadAdminUsers();
     showToast('User updated', 'success');
     return;
   }
 
-  const payload = { fullName, email, phone, department, status, role, balance };
+  const payload = { fullName, email, phone, department, status, role, balance, transferBlocked, dailyLimit, monthlyLimit };
   if (password) payload.password = password;
   const res = await apiFetch(`/admin/users/${id}`, 'PUT', payload);
   if (!res) return;
@@ -1558,6 +1642,72 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function togglePassword(id, button) {
+  const input = document.getElementById(id);
+  input.type = input.type === 'password' ? 'text' : 'password';
+  button.setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password');
+  button.textContent = input.type === 'password' ? '◉' : '⊙';
+}
+
+async function submitHelpRequest() {
+  const category = document.querySelector('input[name="help-category"]:checked')?.value;
+  const message = document.getElementById('help-message').value.trim();
+  if (!category || !message) { showToast('Choose a problem and enter a message', 'error'); return; }
+  if (DEMO_MODE) { showToast('Support request sent (demo mode)', 'success'); return; }
+  const res = await apiFetch('/help', 'POST', { category, message });
+  if (!res) return;
+  document.getElementById('help-message').value = '';
+  document.querySelectorAll('input[name="help-category"]').forEach(input => { input.checked = false; });
+  showToast('Your request was sent to admin', 'success');
+  loadHelp();
+}
+
+async function loadHelp() {
+  if (DEMO_MODE) return;
+  const requests = await apiFetch('/help/my');
+  if (!requests) return;
+  document.getElementById('my-help-requests').innerHTML = requests.length ? requests.map(request => `
+    <div class="alert-card ${request.status === 'resolved' ? 'low' : 'high'}"><div class="alert-msg"><strong>${request.category.replaceAll('_', ' ')}</strong><div style="margin-top:4px">${request.message}</div><div class="mono" style="margin-top:5px">${fmtDate(request.createdAt)} · ${request.status}</div>${request.adminNote ? `<div style="margin-top:5px;color:var(--green)">Admin: ${request.adminNote}</div>` : ''}</div></div>`).join('') : '<div class="empty-state"><p>No support requests</p></div>';
+}
+
+async function loadAdminHelp() {
+  if (DEMO_MODE) return;
+  const requests = await apiFetch('/admin/help-requests');
+  if (!requests) return;
+  const filter = document.getElementById('help-filter').value;
+  const filtered = filter ? requests.filter(request => request.status === filter) : requests;
+  document.getElementById('admin-help-list').innerHTML = filtered.length ? filtered.map(request => `
+    <div class="alert-card ${request.status === 'resolved' ? 'low' : 'high'}"><div class="alert-msg"><strong>${request.category.replaceAll('_', ' ')}</strong><div class="mono">${request.user} · ${fmtDate(request.createdAt)}</div><div style="margin-top:6px">${request.message}</div>${request.adminNote ? `<div style="margin-top:5px;color:var(--green)">Note: ${request.adminNote}</div>` : ''}</div><div>${request.status === 'open' ? `<button class="btn btn-success" onclick="resolveHelp('${request.id}')">Resolve</button>` : '<span class="badge active">Resolved</span>'}</div></div>`).join('') : '<div class="empty-state"><p>No requests found</p></div>';
+  const logs = await apiFetch('/admin/pipeline-status?limit=5');
+  document.getElementById('admin-notifications').innerHTML = logs?.recentBuilds?.length ? logs.recentBuilds.map(log => `<div style="padding:10px 0;border-bottom:1px solid var(--border)"><strong>${log.workflow}</strong> <span class="badge ${log.status === 'passed' ? 'confirmed' : 'flagged'}">${log.status}</span><div class="mono">${fmtDate(log.timestamp)} · ${log.branch}</div></div>`).join('') : '<div class="empty-state"><p>No recent system notifications</p></div>';
+}
+
+async function resolveHelp(id) {
+  const note = prompt('Optional resolution note:') || '';
+  const res = await apiFetch(`/admin/help-requests/${id}/resolve`, 'PUT', { adminNote: note });
+  if (res) { showToast('Support request resolved', 'success'); loadAdminHelp(); }
+}
+
+async function loadAdminGovernance() {
+  if (DEMO_MODE) return;
+  const [addresses, logs] = await Promise.all([apiFetch('/admin/watched-addresses'), apiFetch('/admin/audit-logs?limit=100')]);
+  if (addresses) document.getElementById('watched-addresses').innerHTML = addresses.length ? addresses.map(address => `<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)"><span class="mono">${address.address} · ${address.risk_level} · ${address.reason || address.label}</span><button class="btn btn-danger" onclick="removeWatchedAddress('${address.address}')">Remove</button></div>`).join('') : '<div class="empty-state"><p>No watched addresses</p></div>';
+  if (logs) document.getElementById('audit-tbody').innerHTML = logs.map(log => `<tr><td class="mono">${fmtDate(log.created_at)}</td><td>${log.actor_username || 'system'}</td><td><span class="badge active">${log.action}</span></td><td>${log.entity_type || '—'} ${log.entity_id || ''}</td><td class="mono">${JSON.stringify(log.metadata || {})}</td></tr>`).join('') || '<tr><td colspan="5">No audit events</td></tr>';
+}
+
+async function addWatchedAddress() {
+  const address = document.getElementById('watch-address').value.trim();
+  const riskLevel = document.getElementById('watch-level').value;
+  const reason = document.getElementById('watch-reason').value.trim();
+  const res = await apiFetch('/admin/watched-addresses', 'POST', { address, riskLevel, reason });
+  if (res) { showToast('Address added to watchlist', 'success'); document.getElementById('watch-address').value = ''; document.getElementById('watch-reason').value = ''; loadAdminGovernance(); }
+}
+
+async function removeWatchedAddress(address) {
+  const res = await apiFetch(`/admin/watched-addresses/${encodeURIComponent(address)}`, 'DELETE');
+  if (res) { showToast('Address removed', 'success'); loadAdminGovernance(); }
+}
 
 // ─────────────────── ADMIN TRANSFER ───────────────────────
 function openAdminTransferModal() {

@@ -17,8 +17,10 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - JWT_SECRET=${JWT_SECRET:-blockchain-monitor-secret-change-in-production}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-    volumes:
-      - ../backend/db.json:/app/db.json   # Persist database
+      - DATABASE_URL=${DATABASE_URL}
+      - BLOCKCHAIN_RPC_URL=${BLOCKCHAIN_RPC_URL}
+      - BLOCKCHAIN_MODE=${BLOCKCHAIN_MODE:-readonly}
+      - BLOCKCHAIN_PRIVATE_KEY=${BLOCKCHAIN_PRIVATE_KEY}
     networks:
       - bcmonitor-net
     healthcheck:
@@ -39,7 +41,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - BACKEND_URL=${BACKEND_URL:-http://backend:5000/api}
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:5000/api}
       - PORT=${FRONTEND_PORT:-3000}
       - NODE_ENV=${NODE_ENV:-production}
     networks:

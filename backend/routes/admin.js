@@ -14,6 +14,16 @@ function projectExists(relativePath) {
   return fs.existsSync(path.join(projectRoot, relativePath));
 }
 
+function publicUser(user) {
+  const { password, ...safeUser } = user;
+  return {
+    ...safeUser,
+    userCode: safeUser.userCode || `${safeUser.username}-${safeUser.id.slice(-6)}`,
+    transferLimits: safeUser.transferLimits || { daily: null, monthly: null },
+    transferBlocked: Boolean(safeUser.transferBlocked)
+  };
+}
+
 async function fetchJson(url, headers = {}) {
   const response = await fetch(url, { headers });
   if (!response.ok) {
@@ -381,7 +391,7 @@ router.get('/users', (req, res) => {
   if (role) users = users.filter(u => u.role === role);
 
   // Remove password from response
-  const safeUsers = users.map(({ password, ...u }) => u);
+  const safeUsers = users.map(publicUser);
   res.json(safeUsers);
 });
 
@@ -406,6 +416,7 @@ router.post('/users', async (req, res) => {
 
     const newUser = {
       id: `user-${uuidv4().slice(0, 8)}`,
+      userCode: `${username}-${Math.floor(100000 + Math.random() * 900000)}`,
       username,
       email,
       password: hashed,
@@ -418,11 +429,12 @@ router.post('/users', async (req, res) => {
       lastLogin: null,
       phone: phone || '',
       department: department || ''
+      ,transferLimits: { daily: null, monthly: null },
+      transferBlocked: false
     };
 
     db.get('users').push(newUser).write();
-    const { password: _, ...safeUser } = newUser;
-    res.status(201).json(safeUser);
+    res.status(201).json(publicUser(newUser));
   } catch (err) {
     res.status(500).json({ error: 'Failed to create user' });
   }
@@ -432,7 +444,7 @@ router.post('/users', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, phone, department, status, role, balance, password } = req.body;
+    const { fullName, email, phone, department, status, role, balance, password, transferBlocked, dailyLimit, monthlyLimit } = req.body;
 
     const user = db.get('users').find({ id }).value();
     if (!user) return res.status(404).json({ error: 'User not found' });
@@ -445,12 +457,18 @@ router.put('/users/:id', async (req, res) => {
     if (status !== undefined) updates.status = status;
     if (role !== undefined) updates.role = role;
     if (balance !== undefined) updates.balance = parseFloat(balance);
+    if (transferBlocked !== undefined) updates.transferBlocked = Boolean(transferBlocked);
+    if (dailyLimit !== undefined || monthlyLimit !== undefined) {
+      updates.transferLimits = {
+        daily: dailyLimit === '' || dailyLimit === null ? null : Math.max(0, Number(dailyLimit)),
+        monthly: monthlyLimit === '' || monthlyLimit === null ? null : Math.max(0, Number(monthlyLimit))
+      };
+    }
     if (password) updates.password = await bcrypt.hash(password, 10);
 
     db.get('users').find({ id }).assign(updates).write();
     const updated = db.get('users').find({ id }).value();
-    const { password: _, ...safeUser } = updated;
-    res.json(safeUser);
+    res.json(publicUser(updated));
   } catch (err) {
     res.status(500).json({ error: 'Failed to update user' });
   }
@@ -467,6 +485,28 @@ router.delete('/users/:id', (req, res) => {
 
   db.get('users').remove({ id }).write();
   res.json({ message: 'User deleted successfully' });
+});
+
+// ─── HELP REQUESTS ──────────────────────────────────────────────────────────
+router.get('/help-requests', (req, res) => {
+  const requests = db.get('helpRequests').value() || [];
+  const users = db.get('users').value();
+  res.json(requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((request) => ({
+    ...request,
+    user: users.find(user => user.id === request.userId)?.fullName || 'Unknown user'
+  })));
+});
+
+router.put('/help-requests/:id/resolve', (req, res) => {
+  const request = db.get('helpRequests').find({ id: req.params.id }).value();
+  if (!request) return res.status(404).json({ error: 'Help request not found' });
+  db.get('helpRequests').find({ id: req.params.id }).assign({
+    status: 'resolved',
+    resolvedBy: req.user.username,
+    resolvedAt: new Date().toISOString(),
+    adminNote: req.body.adminNote || ''
+  }).write();
+  res.json({ message: 'Help request resolved' });
 });
 
 // ─── GET /api/admin/cicd ─────────────────────────────────────────────────────

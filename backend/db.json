@@ -11,9 +11,15 @@
       "balance": 984984,
       "status": "active",
       "createdAt": "2024-01-01T00:00:00.000Z",
-      "lastLogin": "2026-08-16T16:42:39.200Z",
+      "lastLogin": "2026-08-20T11:15:55.645Z",
       "phone": "+91-9876543210",
-      "department": "IT Security"
+      "department": "IT Security",
+      "userCode": "admin-272062",
+      "transferLimits": {
+        "daily": null,
+        "monthly": null
+      },
+      "transferBlocked": false
     },
     {
       "id": "user-001",
@@ -23,12 +29,18 @@
       "role": "user",
       "fullName": "MD Junaid",
       "walletAddress": "0x1234567890abcdef1234567890abcdef12345678",
-      "balance": 54233.23,
+      "balance": 24203.23,
       "status": "active",
       "createdAt": "2024-01-15T10:00:00.000Z",
-      "lastLogin": "2026-05-15T04:03:45.314Z",
+      "lastLogin": "2026-08-20T10:33:26.524Z",
       "phone": "+91-9988776655",
-      "department": "Engineering"
+      "department": "Engineering",
+      "userCode": "junaid-139692",
+      "transferLimits": {
+        "daily": null,
+        "monthly": null
+      },
+      "transferBlocked": true
     },
     {
       "id": "user-002",
@@ -38,12 +50,18 @@
       "role": "user",
       "fullName": "Rajesh Padashetty",
       "walletAddress": "0xabcdef1234567890abcdef1234567890abcdef12",
-      "balance": 258959,
+      "balance": 218919,
       "status": "active",
       "createdAt": "2024-01-16T11:00:00.000Z",
-      "lastLogin": "2026-08-14T14:34:37.362Z",
+      "lastLogin": "2026-08-20T11:14:49.443Z",
       "phone": "+91-9876543211",
-      "department": "Finance"
+      "department": "Finance",
+      "userCode": "rajesh-137410",
+      "transferLimits": {
+        "daily": null,
+        "monthly": null
+      },
+      "transferBlocked": false
     },
     {
       "id": "user-003",
@@ -53,12 +71,18 @@
       "role": "user",
       "fullName": "Sharanagouda",
       "walletAddress": "0x9876543210fedcba9876543210fedcba98765432",
-      "balance": 23959.2798,
+      "balance": 73959.2798,
       "status": "active",
       "createdAt": "2024-01-17T09:00:00.000Z",
       "lastLogin": "2026-05-15T04:12:24.491Z",
       "phone": "+91-9765432100",
-      "department": "Operations"
+      "department": "Operations",
+      "userCode": "sharanagouda-691498",
+      "transferLimits": {
+        "daily": null,
+        "monthly": null
+      },
+      "transferBlocked": false
     },
     {
       "id": "user-93b78ac3",
@@ -68,15 +92,88 @@
       "role": "user",
       "fullName": "sainath patil",
       "walletAddress": "0x0528372068cccbcb3681c7a9445fb9e1ad8c2276",
-      "balance": 90.1,
+      "balance": 20090.1,
       "status": "active",
       "createdAt": "2026-05-14T16:37:48.177Z",
       "lastLogin": "2026-05-14T18:40:14.404Z",
       "phone": "9676788234",
-      "department": "cs"
+      "department": "cs",
+      "userCode": "sainath-755111",
+      "transferLimits": {
+        "daily": null,
+        "monthly": null
+      },
+      "transferBlocked": false
     }
   ],
   "transactions": [
+    {
+      "id": "tx-cfd471b4",
+      "txHash": "0x99b86664c2bfb69750c8c7afffb87659bbca0b0e0e4c3ca4e84cb6146d37ad9c",
+      "fromUserId": "user-001",
+      "toUserId": "user-003",
+      "fromAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "toAddress": "0x9876543210fedcba9876543210fedcba98765432",
+      "amount": 30000,
+      "fee": 30,
+      "status": "confirmed",
+      "blockNumber": 18510050,
+      "timestamp": "2026-08-20T06:23:33.495Z",
+      "note": "[ADMIN] Administrative transfer",
+      "suspicionScore": 0.41,
+      "suspicious": false,
+      "suspicionReasons": [
+        "Extremely large amount (>$20,000)",
+        "No transaction history (new user)",
+        "New/unfamiliar recipient",
+        "Suspicious round number amount"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "tx-f85702c1",
+      "txHash": "0x422f3076a73eed498df38b32453e2e14ed95cf95b938f395d5ba9c1cb9eb64cd",
+      "fromUserId": "user-002",
+      "toUserId": "user-003",
+      "fromAddress": "0xabcdef1234567890abcdef1234567890abcdef12",
+      "toAddress": "0x9876543210fedcba9876543210fedcba98765432",
+      "amount": 20000,
+      "fee": 20,
+      "status": "confirmed",
+      "blockNumber": 18515436,
+      "timestamp": "2026-08-20T06:22:02.715Z",
+      "note": "",
+      "suspicionScore": 0.36,
+      "suspicious": false,
+      "suspicionReasons": [
+        "Extremely large amount (>$20,000)",
+        "New/unfamiliar recipient",
+        "Suspicious round number amount"
+      ],
+      "severity": "medium"
+    },
+    {
+      "id": "tx-a478f261",
+      "txHash": "0x9dcdb1baa052a58a399b1a7f181d0eb41c3df3c2464aeff30859e48d3cf78315",
+      "fromUserId": "user-002",
+      "toUserId": "user-93b78ac3",
+      "fromAddress": "0xabcdef1234567890abcdef1234567890abcdef12",
+      "toAddress": "0x0528372068cccbcb3681c7a9445fb9e1ad8c2276",
+      "amount": 20000,
+      "fee": 20,
+      "status": "confirmed",
+      "blockNumber": 18463524,
+      "timestamp": "2026-08-19T14:51:00.673Z",
+      "note": "",
+      "suspicionScore": 0.36,
+      "suspicious": false,
+      "suspicionReasons": [
+        "Extremely large amount (>$20,000)",
+        "New/unfamiliar recipient",
+        "Suspicious round number amount"
+      ],
+      "severity": "medium"
+    },
     {
       "id": "tx-0393df63",
       "txHash": "0xa03acd4b59260ef33ad828aea85bdd17731ab5c55ee757372c81edb683e46a92",
@@ -676,6 +773,102 @@
       "message": "High transaction volume detected from user-002",
       "timestamp": "2024-06-02T02:14:50.000Z",
       "source": "anomaly-detector"
+    },
+    {
+      "id": "014b013c-0293-4416-9aba-8eba94ab26fb",
+      "type": "cicd-pipeline",
+      "workflow": "CI/CD Pipeline",
+      "status": "passed",
+      "commit": "abc123def456",
+      "branch": "main",
+      "timestamp": "2026-08-19T12:15:31.532Z",
+      "buildNumber": 1,
+      "author": "test-user",
+      "createdAt": "2026-08-19T12:15:31.531Z"
+    },
+    {
+      "id": "8f96e514-7595-450d-b170-ac0ad8d29790",
+      "type": "cicd-pipeline",
+      "workflow": "CI/CD Pipeline",
+      "status": "passed",
+      "commit": "abc123def456",
+      "branch": "main",
+      "timestamp": "2026-08-19T12:32:38.223Z",
+      "buildNumber": 1,
+      "author": "test-user",
+      "createdAt": "2026-08-19T12:32:38.229Z"
+    },
+    {
+      "id": "3b40c46f-a404-408d-afa6-a5ff2c775b58",
+      "type": "cicd-pipeline",
+      "workflow": "Backend API",
+      "status": "passed",
+      "commit": "backend-local",
+      "branch": "main",
+      "timestamp": "2026-08-19T12:35:20.651Z",
+      "buildNumber": 101,
+      "author": "local-test",
+      "createdAt": "2026-08-19T12:35:20.662Z"
+    },
+    {
+      "id": "77eeaa5a-5629-4e1c-aa34-277d35cb4a3d",
+      "type": "cicd-pipeline",
+      "workflow": "Frontend UI",
+      "status": "passed",
+      "commit": "frontend-local",
+      "branch": "main",
+      "timestamp": "2026-08-19T12:35:20.667Z",
+      "buildNumber": 102,
+      "author": "local-test",
+      "createdAt": "2026-08-19T12:35:20.675Z"
+    },
+    {
+      "id": "5feb38a6-a1b7-42f7-a390-32fd7f353817",
+      "type": "cicd-pipeline",
+      "workflow": "ML Anomaly Detector",
+      "status": "passed",
+      "commit": "ml-local",
+      "branch": "feature/anomaly-v2",
+      "timestamp": "2026-08-19T12:35:20.675Z",
+      "buildNumber": 103,
+      "author": "local-test",
+      "createdAt": "2026-08-19T12:35:20.683Z"
+    },
+    {
+      "id": "6c761074-455b-4848-89df-f320c9400d69",
+      "type": "cicd-pipeline",
+      "workflow": "Security Tests",
+      "status": "failed",
+      "commit": "security-local",
+      "branch": "main",
+      "timestamp": "2026-08-19T12:35:20.684Z",
+      "buildNumber": 104,
+      "author": "local-test",
+      "createdAt": "2026-08-19T12:35:20.707Z"
+    }
+  ],
+  "helpRequests": [
+    {
+      "id": "help-bf08d36a",
+      "userId": "user-002",
+      "category": "other",
+      "message": "ee",
+      "status": "open",
+      "createdAt": "2026-08-20T10:31:25.941Z",
+      "resolvedBy": null,
+      "resolvedAt": null,
+      "adminNote": ""
+    },
+    {
+      "id": "help-f898f5c8",
+      "userId": "user-002",
+      "category": "transaction_failure",
+      "message": "hh",
+      "status": "resolved",
+      "createdAt": "2026-08-20T10:30:01.483Z",
+      "resolvedBy": "admin",
+      "resolvedAt": "2026-08-20T10:30:39.342Z",
+      "adminNote": ""
     }
   ]
 }

@@ -26,7 +26,7 @@ router.put('/profile', authenticateToken, (req, res) => {
 });
 
 // ─── GET /api/users/search/:query ────────────────────────────────────────────
-// Search users by username or wallet address (for transfer recipient lookup)
+// Search users by public ID, username, name, phone, or wallet address.
 router.get('/search/:query', authenticateToken, (req, res) => {
   const q = req.params.query.toLowerCase();
   const users = db.get('users')
@@ -34,10 +34,14 @@ router.get('/search/:query', authenticateToken, (req, res) => {
       u.id !== req.user.id &&
       u.role === 'user' &&
       u.status === 'active' &&
-      (u.username.toLowerCase().includes(q) || u.walletAddress.toLowerCase().includes(q))
+      (u.userCode || '').toLowerCase().includes(q) ||
+      u.username.toLowerCase().includes(q) ||
+      u.fullName.toLowerCase().includes(q) ||
+      (u.phone || '').toLowerCase().includes(q) ||
+      u.walletAddress.toLowerCase().includes(q)
     )
     .value()
-    .map(({ password, balance, ...safe }) => safe) // don't expose balance
+    .map(({ password, balance, ...safe }) => safe)
     .slice(0, 10);
 
   res.json(users);

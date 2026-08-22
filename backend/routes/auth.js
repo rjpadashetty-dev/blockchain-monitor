@@ -42,6 +42,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        userCode: user.userCode,
         email: user.email,
         fullName: user.fullName,
         role: user.role,
@@ -50,6 +51,8 @@ router.post('/login', async (req, res) => {
         phone: user.phone,
         department: user.department,
         status: user.status,
+        transferBlocked: Boolean(user.transferBlocked),
+        transferLimits: user.transferLimits || { daily: null, monthly: null },
         createdAt: user.createdAt,
         lastLogin: new Date().toISOString()
       }

@@ -3,8 +3,34 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../utils/db');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { analyzeTransaction } = require('../ml/anomalyDetector');
+const database = require('../utils/database');
+const { recordAudit } = require('../utils/audit');
+const { notify } = require('../utils/realtime');
 
 const router = express.Router();
+
+function getTransferUsage(userId, start) {
+  return db.get('transactions').value()
+    .filter(tx => tx.fromUserId === userId && new Date(tx.timestamp) >= start)
+    .reduce((sum, tx) => sum + Number(tx.amount || 0), 0);
+}
+
+function validateTransferPolicy(sender, recipient, amount) {
+  if (sender.transferBlocked) return 'Your transfer access is blocked by an administrator.';
+  if (recipient.transferBlocked) return 'This recipient cannot currently send or receive funds.';
+
+  const limits = sender.transferLimits || {};
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (limits.daily !== null && limits.daily !== undefined && getTransferUsage(sender.id, dayStart) + amount > Number(limits.daily)) {
+    return `Daily transfer limit of ₹${Number(limits.daily).toFixed(2)} would be exceeded.`;
+  }
+  if (limits.monthly !== null && limits.monthly !== undefined && getTransferUsage(sender.id, monthStart) + amount > Number(limits.monthly)) {
+    return `Monthly transfer limit of ₹${Number(limits.monthly).toFixed(2)} would be exceeded.`;
+  }
+  return null;
+}
 
 // ─── GET /api/transactions/my ─────────────────────────────────────────────────
 // Get current user's transactions
@@ -52,7 +78,7 @@ router.post('/transfer', authenticateToken, async (req, res) => {
 
     const sender = db.get('users').find({ id: req.user.id }).value();
     const recipient = db.get('users').find(u =>
-      u.username === toUsername || u.email === toUsername || u.walletAddress === toUsername
+      u.username === toUsername || u.userCode === toUsername || u.email === toUsername || u.walletAddress === toUsername
     ).value();
 
     if (!recipient) {
@@ -64,6 +90,9 @@ router.post('/transfer', authenticateToken, async (req, res) => {
     if (sender.balance < amt) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
+
+    const policyError = validateTransferPolicy(sender, recipient, amt);
+    if (policyError) return res.status(403).json({ error: policyError });
 
     const fee = parseFloat((amt * 0.001).toFixed(4)); // 0.1% fee
     const totalDeducted = amt + fee;
@@ -129,7 +158,10 @@ router.post('/transfer', authenticateToken, async (req, res) => {
         resolvedAt: null
       };
       db.get('alerts').push(alert).write();
+      notify('security:high-risk-transaction', { transaction, alert });
     }
+
+    await recordAudit({ actor: sender, action: 'transaction.transfer', entityType: 'transaction', entityId: transaction.id, metadata: { amount: amt, recipient: recipient.username }, req });
 
     res.json({
       success: true,
@@ -159,8 +191,8 @@ router.post('/admin-transfer', authenticateToken, requireAdmin, async (req, res)
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
-    const sender = db.get('users').find(u => u.username === fromUsername).value();
-    const recipient = db.get('users').find(u => u.username === toUsername).value();
+    const sender = db.get('users').find(u => u.username === fromUsername || u.userCode === fromUsername).value();
+    const recipient = db.get('users').find(u => u.username === toUsername || u.userCode === toUsername).value();
 
     if (!sender) {
       return res.status(404).json({ error: 'Sender not found' });
@@ -174,6 +206,9 @@ router.post('/admin-transfer', authenticateToken, requireAdmin, async (req, res)
     if (sender.balance < amt) {
       return res.status(400).json({ error: 'Insufficient balance' });
     }
+
+    const policyError = validateTransferPolicy(sender, recipient, amt);
+    if (policyError) return res.status(403).json({ error: policyError });
 
     const fee = parseFloat((amt * 0.001).toFixed(4)); // 0.1% fee
     const totalDeducted = amt + fee;
