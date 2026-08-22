@@ -10,7 +10,7 @@ WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN apk add --no-cache wget
 COPY --from=builder /app/node_modules ./node_modules
-COPY . .
+COPY --chown=appuser:appgroup . .
 
 # Remove dev files
 RUN rm -f .env.example Dockerfile docker-compose.yml

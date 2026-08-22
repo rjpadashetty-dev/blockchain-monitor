@@ -535,9 +535,9 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <div class="card-header">
         <h3>Transactions</h3>
         <div style="display:flex;gap:8px;align-items:center">
-          <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:var(--font);font-size:12px">
-            <option value="">All</option><option value="true">Suspicious only</option>
-          </select>
+          <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:170px">
+          <select id="tx-filter-status" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
+          <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All</option><option value="true">Flagged only</option></select>
           <button class="btn btn-primary" onclick="openAdminTransferModal()" style="font-size:12px;padding:6px 12px">+ Transfer</button>
         </div>
       </div>
@@ -578,7 +578,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>User / Public ID</th><th>Phone</th><th>Balance</th><th>Transfer Policy</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>User / Public ID</th><th>Balance</th><th>Transfer Policy</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="admin-users-tbody"></tbody>
         </table>
       </div>
@@ -684,6 +684,24 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <button class="btn btn-primary" onclick="submitEditUser()">Save Changes</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-edit-user')">Cancel</button>
   </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-user-details">
+<div class="modal" style="width:760px">
+  <button class="modal-close" onclick="closeModal('modal-user-details')">✕</button>
+  <h2 id="ud-title">User Details</h2>
+  <div id="ud-profile" class="info-grid"></div>
+  <div class="card" style="margin-top:20px;padding:16px;background:var(--bg2)">
+    <div class="card-header"><h3>Transaction History</h3></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="ud-tx-search" placeholder="Search user or amount" oninput="loadUserTransactions()" style="flex:1;min-width:160px;padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px">
+      <select id="ud-tx-direction" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All</option><option value="sent">Sent</option><option value="received">Received</option></select>
+      <select id="ud-tx-status" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
+    </div>
+    <div id="ud-transactions"></div>
+  </div>
+  <div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="ud-edit" class="btn btn-primary">Edit User</button></div>
 </div>
 </div>
 
@@ -1190,7 +1208,7 @@ async function loadAdminOverview() {
   `).join('');
 
   // Alerts preview
-  const alerts = getMockAlerts().filter(a=>!a.resolved).slice(0,3);
+  const alerts = (data.recentAlerts || []).filter(a=>!a.resolved).slice(0,3);
   document.getElementById('admin-alert-preview').innerHTML = alerts.length === 0
     ? '<div class="empty-state"><div class="ico">✓</div><p>No active alerts</p></div>'
     : alerts.map(a=>`
@@ -1204,7 +1222,7 @@ async function loadAdminOverview() {
       </div>`).join('');
 
   // Recent tx
-  const txs = getMockAllTx().slice(0,5);
+  const txs = data.recentTransactions || [];
   document.getElementById('admin-recent-tx').innerHTML = `<div class="table-wrap"><table><thead><tr><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Risk</th><th>Date</th></tr></thead><tbody>
     ${txs.map(tx=>`<tr>
       <td>${tx.fromName||tx.fromUsername}</td>
@@ -1220,16 +1238,20 @@ async function loadAdminOverview() {
 // ─────────────────── ADMIN TRANSACTIONS ───────────────────
 async function loadAllTx(page=1) {
   const suspicious = document.getElementById('tx-filter-suspicious')?.value;
+  const status = document.getElementById('tx-filter-status')?.value;
+  const search = document.getElementById('tx-search')?.value.trim();
   let txs = [];
   if (DEMO_MODE) {
     txs = getMockAllTx();
   } else {
-    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}`;
+    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}${status ? `&status=${status}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
     const res = await apiFetch(`/transactions/all${query}`);
     if (!res) return;
     txs = res.transactions || [];
   }
   if (suspicious === 'true' && DEMO_MODE) txs = txs.filter(t=>t.suspicious);
+  if (status && DEMO_MODE) txs = txs.filter(t=>t.status === status);
+  if (search && DEMO_MODE) txs = txs.filter(t => `${t.fromName} ${t.toName} ${t.amount}`.toLowerCase().includes(search.toLowerCase()));
 
   document.getElementById('admin-tx-tbody').innerHTML = txs.map(tx=>`
     <tr>
@@ -1315,21 +1337,49 @@ async function loadAdminUsers() {
   document.getElementById('admin-users-tbody').innerHTML = users.map(u=>`
     <tr>
       <td>
-        <div style="font-weight:600">${u.fullName}</div>
+        <div style="font-weight:600;color:var(--primary);cursor:pointer" onclick='openUserDetails(${JSON.stringify(u)})'>${u.fullName}</div>
         <div class="mono" style="color:var(--primary)">${u.userCode || u.username}</div>
       </td>
-      <td>${u.phone || '—'}</td>
       <td class="mono" style="color:var(--primary)">₹${fmt(u.balance)}</td>
       <td class="mono">${u.transferBlocked ? '<span class="badge suspended">Blocked</span>' : `Day: ${u.transferLimits?.daily == null ? '∞' : '₹'+fmt(u.transferLimits.daily)}<br>Month: ${u.transferLimits?.monthly == null ? '∞' : '₹'+fmt(u.transferLimits.monthly)}`}</td>
       <td><span class="badge ${u.role}">${u.role}</span></td>
       <td><span class="badge ${u.status}">${u.status}</span></td>
       <td>
         <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick='openEditUserModal(${JSON.stringify(u)})'>Edit</button>
+          <button class="btn btn-ghost" style="padding:5px 10px;font-size:11px" onclick='openUserDetails(${JSON.stringify(u)})'>View</button>
           ${u.id !== 'admin-001' ? `<button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="deleteUser('${u.id}','${u.fullName}')">Del</button>` : ''}
         </div>
       </td>
-    </tr>`).join('') || '<tr><td colspan="7"><div class="empty-state"><div class="ico">◎</div><p>No users found</p></div></td></tr>';
+    </tr>`).join('') || '<tr><td colspan="6"><div class="empty-state"><div class="ico">◎</div><p>No users found</p></div></td></tr>';
+}
+
+let selectedAdminUser = null;
+function openUserDetails(user) {
+  selectedAdminUser = user;
+  document.getElementById('ud-title').textContent = `${user.fullName} · User Details`;
+  document.getElementById('ud-profile').innerHTML = [['Username', user.username], ['Public ID', user.userCode || '—'], ['Email', user.email], ['Phone', user.phone || '—'], ['Department', user.department || '—'], ['Wallet', user.walletAddress || '—'], ['Balance', `₹${fmt(user.balance)}`], ['Role', user.role], ['Status', user.status], ['Transfer', user.transferBlocked ? 'Blocked' : 'Allowed']].map(([label,value]) => `<div class="info-item"><div class="info-label">${label}</div><div class="info-value">${value}</div></div>`).join('');
+  document.getElementById('ud-edit').onclick = () => { closeModal('modal-user-details'); openEditUserModal(selectedAdminUser); };
+  document.getElementById('ud-tx-search').value = '';
+  document.getElementById('ud-tx-direction').value = '';
+  document.getElementById('ud-tx-status').value = '';
+  openModal('modal-user-details');
+  loadUserTransactions();
+}
+
+async function loadUserTransactions() {
+  if (!selectedAdminUser) return;
+  const search = document.getElementById('ud-tx-search').value.trim();
+  const direction = document.getElementById('ud-tx-direction').value;
+  const status = document.getElementById('ud-tx-status').value;
+  const query = new URLSearchParams({ userId: selectedAdminUser.id });
+  if (search) query.set('search', search);
+  if (status) query.set('status', status);
+  const res = await apiFetch(`/transactions/all?${query}`);
+  let txs = res?.transactions || [];
+  if (DEMO_MODE) txs = getMockAllTx().filter(tx => tx.fromUserId === selectedAdminUser.id || tx.toUserId === selectedAdminUser.id);
+  if (direction === 'sent') txs = txs.filter(tx => tx.fromUserId === selectedAdminUser.id);
+  if (direction === 'received') txs = txs.filter(tx => tx.toUserId === selectedAdminUser.id);
+  document.getElementById('ud-transactions').innerHTML = txs.length ? `<div class="table-wrap"><table><thead><tr><th>From</th><th>To</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead><tbody>${txs.map(tx => `<tr><td>${tx.fromName || tx.fromUsername}</td><td>${tx.toName || tx.toUsername}</td><td class="mono">₹${fmt(tx.amount)}</td><td><span class="badge ${tx.status}">${tx.status}</span></td><td class="mono">${fmtDate(tx.timestamp)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty-state"><p>No matching transactions</p></div>';
 }
 
 function openAddUserModal() { openModal('modal-add-user'); }

@@ -145,12 +145,30 @@ router.delete('/admin/watched-addresses/:address', requireUser, requireAdmin, as
 });
 
 router.get('/admin/overview', requireUser, requireAdmin, async (req, res) => {
-  const [users, txs, alerts] = await Promise.all([
+  const [users, txs, alerts, recentAlerts, recentTransactions] = await Promise.all([
     database.query(`SELECT COUNT(*) FILTER (WHERE role='user')::int AS total, COUNT(*) FILTER (WHERE role='user' AND status='active')::int AS active FROM users`),
-    database.query('SELECT COUNT(*)::int AS total, COALESCE(SUM(amount),0) AS volume, COUNT(*) FILTER (WHERE suspicious)::int AS suspicious FROM transactions'),
-    database.query('SELECT COUNT(*) FILTER (WHERE NOT resolved)::int AS unresolved FROM alerts')
+    database.query(`SELECT COUNT(*)::int AS total, COALESCE(SUM(amount),0) AS volume,
+      COUNT(*) FILTER (WHERE suspicious)::int AS suspicious,
+      COUNT(*) FILTER (WHERE status='confirmed')::int AS confirmed,
+      COUNT(*) FILTER (WHERE status='flagged')::int AS flagged FROM transactions`),
+    database.query('SELECT COUNT(*) FILTER (WHERE NOT resolved)::int AS unresolved FROM alerts'),
+    database.query(`SELECT a.*, u.username, u.full_name AS "userName", t.amount AS "transactionAmount", t.suspicion_score AS "suspicionScore"
+      FROM alerts a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN transactions t ON t.id=a.transaction_id
+      WHERE NOT a.resolved ORDER BY a.timestamp DESC LIMIT 5`),
+    database.query(`SELECT t.*, fu.username AS "fromUsername", fu.full_name AS "fromName", tu.username AS "toUsername", tu.full_name AS "toName"
+      FROM transactions t JOIN users fu ON fu.id=t.from_user_id JOIN users tu ON tu.id=t.to_user_id ORDER BY t.timestamp DESC LIMIT 5`)
   ]);
-  res.json({ stats: { totalUsers: users.rows[0].total, activeUsers: users.rows[0].active, totalTransactions: txs.rows[0].total, totalVolume: Number(txs.rows[0].volume), suspiciousTransactions: txs.rows[0].suspicious, unresolvedAlerts: alerts.rows[0].unresolved } });
+  const chartResult = await database.query(`SELECT TO_CHAR(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+    COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS volume, COUNT(*) FILTER (WHERE suspicious)::int AS suspicious
+    FROM transactions WHERE timestamp >= NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1`);
+  res.json({
+    stats: { totalUsers: users.rows[0].total, activeUsers: users.rows[0].active, totalTransactions: txs.rows[0].total,
+      totalVolume: Number(txs.rows[0].volume), suspiciousTransactions: txs.rows[0].suspicious,
+      confirmedTxs: txs.rows[0].confirmed, flaggedTxs: txs.rows[0].flagged, unresolvedAlerts: alerts.rows[0].unresolved },
+    chartData: chartResult.rows.map(row => ({ ...row, volume: Number(row.volume) })),
+    recentAlerts: recentAlerts.rows,
+    recentTransactions: recentTransactions.rows.map(safeTransaction)
+  });
 });
 
 router.post('/admin/pipeline-status', async (req, res) => {
@@ -177,10 +195,45 @@ router.get('/transactions/my', requireUser, async (req, res) => {
 
 router.get('/transactions/all', requireUser, requireAdmin, async (req, res) => {
   const suspicious = req.query.suspicious === 'true';
+  const search = req.query.search ? `%${req.query.search.toLowerCase()}%` : null;
+  const status = req.query.status || null;
+  const userId = req.query.userId || null;
   const result = await database.query(`SELECT t.*, fu.username AS "fromUsername", fu.full_name AS "fromName", tu.username AS "toUsername", tu.full_name AS "toName"
     FROM transactions t JOIN users fu ON fu.id=t.from_user_id JOIN users tu ON tu.id=t.to_user_id
-    WHERE ($1::boolean = FALSE OR t.suspicious = TRUE) ORDER BY t.timestamp DESC`, [suspicious]);
+    WHERE ($1::boolean = FALSE OR t.suspicious = TRUE)
+      AND ($2::text IS NULL OR t.status=$2)
+      AND ($3::text IS NULL OR t.from_user_id=$3 OR t.to_user_id=$3)
+      AND ($4::text IS NULL OR LOWER(fu.username) LIKE $4 OR LOWER(fu.full_name) LIKE $4 OR LOWER(tu.username) LIKE $4 OR LOWER(tu.full_name) LIKE $4 OR t.amount::text LIKE $4)
+    ORDER BY t.timestamp DESC`, [suspicious, status, userId, search]);
   res.json({ transactions: result.rows.map(safeTransaction), total: result.rows.length, page: 1, pages: 1 });
+});
+
+router.post('/transactions/admin-transfer', requireUser, requireAdmin, async (req, res) => {
+  const { fromUsername, toUsername, amount, note } = req.body;
+  const numericAmount = Number(amount);
+  if (!fromUsername || !toUsername || !Number.isFinite(numericAmount) || numericAmount <= 0) return res.status(400).json({ error: 'Sender, recipient and valid amount are required' });
+  const client = await database.getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const senderResult = await client.query('SELECT * FROM users WHERE username=$1 OR user_code=$1 FOR UPDATE', [fromUsername]);
+    const recipientResult = await client.query('SELECT * FROM users WHERE username=$1 OR user_code=$1 FOR UPDATE', [toUsername]);
+    const sender = senderResult.rows[0]; const recipient = recipientResult.rows[0];
+    if (!sender || !recipient) { await client.query('ROLLBACK'); return res.status(404).json({ error: !sender ? 'Sender not found' : 'Recipient not found' }); }
+    if (sender.id === recipient.id) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Cannot transfer to yourself' }); }
+    const fee = Number((numericAmount * 0.001).toFixed(4));
+    if (sender.transfer_blocked || recipient.transfer_blocked) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Transfers are blocked for this account or recipient' }); }
+    if (Number(sender.balance) < numericAmount + fee) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Insufficient balance including fee' }); }
+    const analysis = analyzeTransaction({ fromUserId: sender.id, toUserId: recipient.id, amount: numericAmount, timestamp: new Date().toISOString() });
+    const id = `tx-${uuidv4().slice(0, 8)}`;
+    const inserted = await client.query(`INSERT INTO transactions (id,tx_hash,from_user_id,to_user_id,from_address,to_address,amount,fee,status,note,suspicion_score,suspicious,suspicion_reasons,severity,chain)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'internal') RETURNING *`, [id, `internal-${uuidv4()}`, sender.id, recipient.id, sender.wallet_address, recipient.wallet_address, numericAmount, fee, analysis.suspicious ? 'flagged' : 'confirmed', `[ADMIN] ${note || 'Administrative transfer'}`, analysis.suspicionScore, analysis.suspicious, JSON.stringify(analysis.suspicionReasons), analysis.severity]);
+    await client.query('UPDATE users SET balance=balance-$1 WHERE id=$2', [numericAmount + fee, sender.id]);
+    await client.query('UPDATE users SET balance=balance+$1 WHERE id=$2', [numericAmount, recipient.id]);
+    if (analysis.suspicious) await client.query('INSERT INTO alerts (id,type,severity,transaction_id,user_id,message) VALUES ($1,$2,$3,$4,$5,$6)', [`alert-${uuidv4().slice(0,8)}`, 'suspicious_transaction', analysis.severity, id, sender.id, `Suspicious admin transfer: ${analysis.suspicionReasons.join(', ')}`]);
+    await client.query('COMMIT');
+    res.json({ success: true, transaction: safeTransaction(inserted.rows[0]), warning: analysis.suspicious ? 'Transfer flagged for review' : null });
+  } catch (error) { await client.query('ROLLBACK'); res.status(500).json({ error: error.message || 'Transfer failed' }); }
+  finally { client.release(); }
 });
 
 router.post('/transactions/transfer', requireUser, async (req, res) => {
