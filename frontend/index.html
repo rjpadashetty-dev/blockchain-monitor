@@ -289,6 +289,10 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .pipeline-indicator.passed { background:#34d399; box-shadow:0 0 0 3px rgba(52,211,153,0.12); }
 .pipeline-indicator.failed { background:#fb7185; box-shadow:0 0 0 3px rgba(251,113,133,0.12); }
 .pipeline-indicator.running { background:#fbbf24; box-shadow:0 0 0 3px rgba(251,191,36,0.12); }
+.pipeline-loop { max-height:360px; overflow:hidden; }
+.pipeline-track { animation:pipelineScroll 22s linear infinite; }
+.pipeline-loop:hover .pipeline-track { animation-play-state:paused; }
+@keyframes pipelineScroll { from { transform:translateY(0); } to { transform:translateY(-50%); } }
 
 @keyframes fadeSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
 @keyframes iconReveal { 0% { opacity:0; transform:scale(0.65) rotate(-8deg); } 65% { opacity:1; transform:scale(1.08) rotate(2deg); } 100% { opacity:1; transform:scale(1) rotate(0); } }
@@ -1492,7 +1496,7 @@ async function loadAdminCICD() {
     failedTests ? 'failed' : builds.length ? 'active' : ''
   );
 
-  document.getElementById('pipeline-status').innerHTML = builds.length > 0 ? builds.map(b => `
+  const pipelineMarkup = builds.map(b => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg2)">
       <div style="display:flex;align-items:center;gap:12px">
         <div class="pipeline-indicator ${b.status === 'passed' ? 'passed' : b.status === 'failed' ? 'failed' : 'running'}"></div>
@@ -1506,7 +1510,10 @@ async function loadAdminCICD() {
         <div style="font-size:10px;color:var(--text3)">${fmtDate(b.timestamp)}</div>
       </div>
     </div>
-  `).join('') : '<div style="padding:20px;text-align:center;color:var(--text3)">No pipeline data yet. Run a workflow to generate metrics.</div>';
+  `).join('');
+  document.getElementById('pipeline-status').innerHTML = builds.length > 0
+    ? `<div class="pipeline-loop"><div class="pipeline-track">${pipelineMarkup}${pipelineMarkup}</div></div>`
+    : '<div style="padding:20px;text-align:center;color:var(--text3)">No pipeline data yet. Run a workflow to generate metrics.</div>';
 
   // Detailed builds table
   document.getElementById('recent-builds').innerHTML = builds.length > 0 ? builds.map((b, idx) => `
