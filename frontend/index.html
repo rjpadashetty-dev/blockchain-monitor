@@ -315,6 +315,21 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .empty-state { text-align:center; padding:40px; color:var(--text3); }
 .empty-state .ico { font-size:40px; margin-bottom:12px; opacity:0.4; }
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
+.transaction-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:14px; margin-bottom:16px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; }
+.transaction-toolbar input, .transaction-toolbar select { height:34px; padding:6px 10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--font); font-size:12px; }
+.transaction-toolbar input:focus, .transaction-toolbar select:focus { border-color:var(--primary); outline:none; }
+.filter-label { width:100%; color:var(--text3); font:11px var(--mono); letter-spacing:1px; text-transform:uppercase; }
+.filter-divider { width:1px; height:24px; background:var(--border); margin:0 2px; }
+.admin-actions { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+.admin-action { display:flex; align-items:center; gap:12px; padding:16px; background:var(--card); border:1px solid var(--border); border-radius:10px; text-align:left; cursor:pointer; transition:border-color .2s, transform .2s; }
+.admin-action:hover { border-color:var(--primary); transform:translateY(-2px); }
+.admin-action .action-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:9px; font-size:20px; }
+.admin-action strong { display:block; font-size:13px; }
+.admin-action span { display:block; margin-top:3px; color:var(--text3); font-size:11px; }
+.admin-action.deposit .action-icon { color:var(--green); background:rgba(16,185,129,.12); }
+.admin-action.withdraw .action-icon { color:var(--red); background:rgba(239,68,68,.12); }
+.admin-action.transfer .action-icon { color:var(--primary); background:rgba(0,212,255,.12); }
+@media(max-width:700px) { .admin-actions { grid-template-columns:1fr; } .filter-divider { display:none; } }
 @media(max-width:900px) { .grid-2 { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -482,6 +497,10 @@ tr:hover td { background:rgba(255,255,255,0.02); }
         <input id="history-date" type="date" title="Filter by date" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
         <input id="history-month" type="month" title="Filter by month" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
         <input id="history-year" type="number" min="2000" max="2100" placeholder="Year" title="Filter by year" oninput="loadHistory(1)" style="width:90px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <input id="history-from" type="date" title="Period start date" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <span class="mono">to</span>
+        <input id="history-to" type="date" title="Period end date" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <button class="btn btn-ghost" onclick="clearHistoryFilters()" style="font-size:12px">Clear</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -546,20 +565,27 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 
   <div class="page" id="page-admin-transactions">
     <div class="page-header"><h1>All Transactions</h1><p>Monitor every blockchain transaction across all users</p></div>
+    <div class="admin-actions">
+      <button class="admin-action deposit" onclick="openAdminWalletModal('deposit')"><span class="action-icon">＋</span><span><strong>Deposit Funds</strong><span>Add funds to a selected user</span></span></button>
+      <button class="admin-action withdraw" onclick="openAdminWalletModal('withdrawal')"><span class="action-icon">−</span><span><strong>Withdraw Funds</strong><span>Remove funds from a selected user</span></span></button>
+      <button class="admin-action transfer" onclick="openAdminTransferModal()"><span class="action-icon">⇄</span><span><strong>Transfer Funds</strong><span>Move funds between users</span></span></button>
+    </div>
     <div class="card">
-      <div class="card-header">
-        <h3>Transactions</h3>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:170px">
-          <select id="tx-filter-type" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
-          <select id="tx-filter-status" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
-          <input id="tx-filter-date" type="date" title="Filter by date" onchange="loadAllTx()" style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
-          <input id="tx-filter-month" type="month" title="Filter by month" onchange="loadAllTx()" style="padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
-          <input id="tx-filter-year" type="number" min="2000" max="2100" placeholder="Year" title="Filter by year" oninput="loadAllTx()" style="width:74px;padding:6px 8px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
-          <button class="btn btn-success" onclick="openAdminWalletModal('deposit')" style="font-size:12px;padding:6px 12px">+ Deposit</button>
-          <button class="btn btn-danger" onclick="openAdminWalletModal('withdrawal')" style="font-size:12px;padding:6px 12px">- Withdraw</button>
-          <button class="btn btn-primary" onclick="openAdminTransferModal()" style="font-size:12px;padding:6px 12px">+ Transfer</button>
-        </div>
+      <div class="card-header"><h3>Transaction Explorer</h3><span class="sub">Filter the monitoring history</span></div>
+      <div class="transaction-toolbar">
+        <span class="filter-label">Search and filter by time</span>
+        <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="width:180px">
+        <select id="tx-filter-type" onchange="loadAllTx()"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
+        <select id="tx-filter-status" onchange="loadAllTx()"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
+        <span class="filter-divider"></span>
+        <input id="tx-filter-date" type="date" title="Specific date" onchange="loadAllTx()">
+        <input id="tx-filter-month" type="month" title="Specific month" onchange="loadAllTx()">
+        <input id="tx-filter-year" type="number" min="2000" max="2100" placeholder="Year" title="Specific year" oninput="loadAllTx()" style="width:78px">
+        <span class="filter-divider"></span>
+        <input id="tx-filter-from" type="date" title="Period start date" onchange="loadAllTx()">
+        <span class="mono">to</span>
+        <input id="tx-filter-to" type="date" title="Period end date" onchange="loadAllTx()">
+        <button class="btn btn-ghost" onclick="clearAdminTxFilters()" style="height:34px;font-size:12px">Clear</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -1199,14 +1225,20 @@ async function doTransfer() {
 }
 
 // ─────────────────── HISTORY ──────────────────────────────
-function matchesDateFilters(timestamp, date, month, year) {
-  if (!date && !month && !year) return true;
+function matchesDateFilters(timestamp, date, month, year, fromDate, toDate) {
+  if (!date && !month && !year && !fromDate && !toDate) return true;
   const value = new Date(timestamp);
   if (Number.isNaN(value.getTime())) return false;
   const isoDate = value.toISOString().slice(0, 10);
   const isoMonth = isoDate.slice(0, 7);
   const isoYear = isoDate.slice(0, 4);
-  return (!date || isoDate === date) && (!month || isoMonth === month) && (!year || isoYear === year);
+  return (!date || isoDate === date) && (!month || isoMonth === month) && (!year || isoYear === year) && (!fromDate || isoDate >= fromDate) && (!toDate || isoDate <= toDate);
+}
+
+function clearHistoryFilters() {
+  ['history-search', 'history-date', 'history-month', 'history-year', 'history-from', 'history-to'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  ['history-type', 'history-status', 'history-risk'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  loadHistory(1);
 }
 
 async function loadHistory(page=1) {
@@ -1227,11 +1259,13 @@ async function loadHistory(page=1) {
   const date = document.getElementById('history-date')?.value || '';
   const month = document.getElementById('history-month')?.value || '';
   const year = document.getElementById('history-year')?.value.trim() || '';
+  const fromDate = document.getElementById('history-from')?.value || '';
+  const toDate = document.getElementById('history-to')?.value || '';
   const filteredTxs = myTxs.filter(tx => {
     const score = tx.suspicionScore || 0;
     const riskLevel = score > 0.7 ? 'high' : score > 0.4 ? 'medium' : 'low';
     const party = `${tx.toName || tx.toUsername || ''} ${tx.fromName || tx.fromUsername || ''} ${tx.amount}`.toLowerCase();
-    return (!search || party.includes(search)) && (!type || (tx.transactionType || 'transfer') === type) && (!status || tx.status === status) && (!risk || riskLevel === risk) && matchesDateFilters(tx.timestamp, date, month, year);
+    return (!search || party.includes(search)) && (!type || (tx.transactionType || 'transfer') === type) && (!status || tx.status === status) && (!risk || riskLevel === risk) && matchesDateFilters(tx.timestamp, date, month, year, fromDate, toDate);
   });
   document.getElementById('tx-count').textContent = `${filteredTxs.length} of ${myTxs.length} total`;
 
@@ -1362,6 +1396,8 @@ async function loadAllTx(page=1) {
   const date = document.getElementById('tx-filter-date')?.value || '';
   const month = document.getElementById('tx-filter-month')?.value || '';
   const year = document.getElementById('tx-filter-year')?.value.trim() || '';
+  const fromDate = document.getElementById('tx-filter-from')?.value || '';
+  const toDate = document.getElementById('tx-filter-to')?.value || '';
   let txs = [];
   if (DEMO_MODE) {
     txs = getMockAllTx();
@@ -1374,7 +1410,7 @@ async function loadAllTx(page=1) {
   if (status && DEMO_MODE) txs = txs.filter(t=>t.status === status);
   if (transactionType && DEMO_MODE) txs = txs.filter(t => (t.transactionType || 'transfer') === transactionType);
   if (search && DEMO_MODE) txs = txs.filter(t => `${t.fromName} ${t.toName} ${t.amount}`.toLowerCase().includes(search.toLowerCase()));
-  txs = txs.filter(t => matchesDateFilters(t.timestamp, date, month, year));
+  txs = txs.filter(t => matchesDateFilters(t.timestamp, date, month, year, fromDate, toDate));
 
   document.getElementById('admin-tx-tbody').innerHTML = txs.map(tx=>`
     <tr>
@@ -1392,6 +1428,12 @@ async function loadAllTx(page=1) {
       <td style="max-width:200px;font-size:11px;color:var(--text3)">${(tx.suspicionReasons||[]).join(', ')||'—'}</td>
       <td class="mono">${fmtDate(tx.timestamp)}</td>
     </tr>`).join('') || '<tr><td colspan="8"><div class="empty-state"><div class="ico">◈</div><p>No transactions</p></div></td></tr>';
+}
+
+function clearAdminTxFilters() {
+  ['tx-search', 'tx-filter-date', 'tx-filter-month', 'tx-filter-year', 'tx-filter-from', 'tx-filter-to'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  ['tx-filter-type', 'tx-filter-status'].forEach(id => { const element = document.getElementById(id); if (element) element.value = ''; });
+  loadAllTx(1);
 }
 
 // ─────────────────── ALERTS ───────────────────────────────
