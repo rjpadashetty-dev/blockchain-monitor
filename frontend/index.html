@@ -143,6 +143,8 @@ body::before {
 .page-header { margin-bottom:28px; }
 .page-header h1 { font-size:24px; font-weight:700; }
 .page-header p { color:var(--text2); font-size:14px; margin-top:4px; }
+.portal-banner { display:flex; align-items:center; gap:10px; margin-bottom:22px; color:var(--primary); font:600 12px var(--mono); letter-spacing:1.5px; text-transform:uppercase; }
+.portal-banner::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--primary); box-shadow:0 0 12px rgba(0,212,255,.7); }
 
 /* Stats grid */
 .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:28px; }
@@ -386,6 +388,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 </aside>
 
 <main class="main">
+  <div class="portal-banner" id="portal-banner">Portal</div>
   <!-- ── USER PAGES ── -->
   <div class="page" id="page-dashboard">
     <div class="page-header">
@@ -827,7 +830,7 @@ let currentLoginTab = 'user';
 function toggleAdminLogin() {
   const tabs = document.getElementById('login-tabs');
   const opening = tabs.style.display === 'none';
-  tabs.style.display = opening ? 'flex' : 'none';
+  tabs.style.display = 'flex';
   setLoginTab(opening ? 'admin' : 'user');
 }
 let recipientDirectory = {};
@@ -840,9 +843,13 @@ const DEMO_MODE = false; // Set to true for testing with mock data
 // ─────────────────── AUTH ─────────────────────────────────
 function setLoginTab(tab) {
   currentLoginTab = tab;
-  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='user')||(i===1&&tab==='admin')));
+  document.querySelectorAll('.tab-btn').forEach((button, index) => {
+    const isSelected = (index === 0 && tab === 'user') || (index === 1 && tab === 'admin');
+    button.classList.toggle('active', isSelected);
+    button.style.display = isSelected ? '' : 'none';
+  });
   document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : '';
-  document.getElementById('login-mode-hint').textContent = tab === 'admin' ? '' : '';
+  document.getElementById('login-mode-hint').textContent = tab === 'admin' ? 'Admin Portal' : 'User Portal';
 }
 
 async function doLogin() {
@@ -915,6 +922,8 @@ function doLogout() {
   authToken = null; currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
+  document.getElementById('login-tabs').style.display = 'none';
+  setLoginTab('user');
   document.getElementById('login-username').value = '';
   document.getElementById('login-password').value = '';
   document.getElementById('login-error').style.display = 'none';
@@ -930,6 +939,7 @@ function initApp() {
   document.getElementById('sb-name').textContent = currentUser.fullName;
   document.getElementById('sb-role').textContent = currentUser.role.toUpperCase() + ' · ' + (currentUser.department || 'N/A');
   document.getElementById('dash-name').textContent = currentUser.fullName.split(' ')[0];
+  document.getElementById('portal-banner').textContent = currentUser.role === 'admin' ? 'Admin Portal' : 'User Portal';
 
   buildSidebar();
   connectRealtime();

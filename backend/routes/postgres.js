@@ -318,7 +318,8 @@ router.post('/transactions/transfer', requireUser, async (req, res) => {
 });
 
 router.get('/alerts', requireUser, requireAdmin, async (req, res) => {
-  const result = await database.query(`SELECT a.*, u.username, u.full_name AS "userName", t.amount AS "transactionAmount", t.suspicion_score AS "suspicionScore" FROM alerts a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN transactions t ON t.id=a.transaction_id ORDER BY a.timestamp DESC`);
+  const resolvedFilter = req.query.resolved === 'true' ? true : req.query.resolved === 'false' ? false : null;
+  const result = await database.query(`SELECT a.*, u.username, u.full_name AS "userName", t.amount AS "transactionAmount", t.suspicion_score AS "suspicionScore" FROM alerts a LEFT JOIN users u ON u.id=a.user_id LEFT JOIN transactions t ON t.id=a.transaction_id WHERE ($1::boolean IS NULL OR a.resolved = $1) ORDER BY a.timestamp DESC`, [resolvedFilter]);
   res.json(result.rows);
 });
 
