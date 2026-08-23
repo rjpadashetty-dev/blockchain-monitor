@@ -827,11 +827,12 @@ const API_BASE = injectedBackendUrl.startsWith('http') && (isLocalFrontend || !i
 let currentUser = null;
 let authToken = null;
 let currentLoginTab = 'user';
+let loginPortalVisible = false;
 function toggleAdminLogin() {
   const tabs = document.getElementById('login-tabs');
-  const opening = tabs.style.display === 'none';
   tabs.style.display = 'flex';
-  setLoginTab(opening ? 'admin' : 'user');
+  loginPortalVisible = !loginPortalVisible;
+  setLoginTab(loginPortalVisible ? 'admin' : 'user');
 }
 let recipientDirectory = {};
 let selectedRecipient = null;
@@ -851,6 +852,8 @@ function setLoginTab(tab) {
   document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : '';
   document.getElementById('login-mode-hint').textContent = tab === 'admin' ? 'Admin Portal' : 'User Portal';
 }
+
+setLoginTab('user');
 
 async function doLogin() {
   const username = document.getElementById('login-username').value.trim();
@@ -923,6 +926,7 @@ function doLogout() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
   document.getElementById('login-tabs').style.display = 'none';
+  loginPortalVisible = false;
   setLoginTab('user');
   document.getElementById('login-username').value = '';
   document.getElementById('login-password').value = '';
