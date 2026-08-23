@@ -351,7 +351,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <h1>TranzSafely</h1>
     <p>Smart Blockchain Security and Monitoring</p>
   </div>
-  <div class="login-tabs" id="login-tabs" style="display:none">
+  <div class="login-tabs" id="login-tabs">
     <button class="tab-btn active" onclick="setLoginTab('user')">👤 User Portal</button>
     <button class="tab-btn" onclick="setLoginTab('admin')">🛡️ Admin Portal</button>
   </div>
@@ -365,7 +365,6 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   </div>
   <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
   <div class="error-msg" id="login-error"></div>
-  <div class="login-hint"><span id="login-mode-hint">User Portal</span></div>
 </div>
 </div>
 
@@ -849,8 +848,7 @@ function setLoginTab(tab) {
     button.classList.toggle('active', isSelected);
     button.style.display = isSelected ? '' : 'none';
   });
-  document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : '';
-  document.getElementById('login-mode-hint').textContent = tab === 'admin' ? 'Admin Portal' : 'User Portal';
+  document.getElementById('login-username').placeholder = 'Enter username';
 }
 
 setLoginTab('user');
@@ -925,7 +923,7 @@ function doLogout() {
   authToken = null; currentUser = null;
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-page').style.display = 'flex';
-  document.getElementById('login-tabs').style.display = 'none';
+  document.getElementById('login-tabs').style.display = 'flex';
   loginPortalVisible = false;
   setLoginTab('user');
   document.getElementById('login-username').value = '';
