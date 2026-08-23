@@ -309,12 +309,13 @@ router.post('/admin-wallet-operation', authenticateToken, requireAdmin, async (r
 
 // ─── GET /api/transactions/all (admin) ───────────────────────────────────────
 router.get('/all', authenticateToken, requireAdmin, (req, res) => {
-  const { page = 1, limit = 25, suspicious, userId } = req.query;
+  const { page = 1, limit = 25, suspicious, userId, transactionType } = req.query;
 
   let query = db.get('transactions');
 
   if (suspicious === 'true') query = query.filter({ suspicious: true });
   if (userId) query = query.filter(tx => tx.fromUserId === userId || tx.toUserId === userId);
+  if (transactionType) query = query.filter(tx => (tx.transactionType || 'transfer') === transactionType);
 
   const all = query.orderBy('timestamp', 'desc').value();
   const start = (page - 1) * limit;

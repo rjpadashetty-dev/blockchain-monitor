@@ -198,6 +198,7 @@ router.get('/transactions/all', requireUser, requireAdmin, async (req, res) => {
   const suspicious = req.query.suspicious === 'true';
   const search = req.query.search ? `%${req.query.search.toLowerCase()}%` : null;
   const status = req.query.status || null;
+  const transactionType = req.query.transactionType || null;
   const userId = req.query.userId || null;
   const result = await database.query(`SELECT t.*, fu.username AS "fromUsername", fu.full_name AS "fromName", tu.username AS "toUsername", tu.full_name AS "toName"
     FROM transactions t JOIN users fu ON fu.id=t.from_user_id JOIN users tu ON tu.id=t.to_user_id
@@ -205,7 +206,8 @@ router.get('/transactions/all', requireUser, requireAdmin, async (req, res) => {
       AND ($2::text IS NULL OR t.status=$2)
       AND ($3::text IS NULL OR t.from_user_id=$3 OR t.to_user_id=$3)
       AND ($4::text IS NULL OR LOWER(fu.username) LIKE $4 OR LOWER(fu.full_name) LIKE $4 OR LOWER(tu.username) LIKE $4 OR LOWER(tu.full_name) LIKE $4 OR t.amount::text LIKE $4)
-    ORDER BY t.timestamp DESC`, [suspicious, status, userId, search]);
+      AND ($5::text IS NULL OR t.transaction_type=$5)
+    ORDER BY t.timestamp DESC`, [suspicious, status, userId, search, transactionType]);
   res.json({ transactions: result.rows.map(safeTransaction), total: result.rows.length, page: 1, pages: 1 });
 });
 

@@ -292,6 +292,8 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .pipeline-loop { max-height:360px; overflow:hidden; }
 .pipeline-track { animation:pipelineScroll 22s linear infinite; }
 .pipeline-loop:hover .pipeline-track { animation-play-state:paused; }
+.pipeline-panel, .recent-builds-panel { height:440px; }
+.recent-builds-scroll { max-height:370px; overflow-y:auto; }
 @keyframes pipelineScroll { from { transform:translateY(0); } to { transform:translateY(-50%); } }
 
 @keyframes fadeSlideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
@@ -536,6 +538,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
         <h3>Transactions</h3>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:170px">
+          <select id="tx-filter-type" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
           <select id="tx-filter-status" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
           <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All</option><option value="true">Flagged only</option></select>
           <button class="btn btn-success" onclick="openAdminWalletModal('deposit')" style="font-size:12px;padding:6px 12px">+ Deposit</button>
@@ -597,13 +600,13 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     </div>
     <div class="stats-grid" id="cicd-stats"></div>
     <div class="grid-2">
-      <div class="card">
+      <div class="card pipeline-panel">
         <div class="card-header"><h3>Pipeline Status</h3></div>
         <div id="pipeline-status"></div>
       </div>
-      <div class="card">
+      <div class="card recent-builds-panel">
         <div class="card-header"><h3>Recent Builds</h3></div>
-        <div id="recent-builds"></div>
+        <div class="recent-builds-scroll" id="recent-builds"></div>
       </div>
     </div>
     <div class="card">
@@ -698,7 +701,8 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <div class="card-header"><h3>Transaction History</h3></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <input id="ud-tx-search" placeholder="Search user or amount" oninput="loadUserTransactions()" style="flex:1;min-width:160px;padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px">
-      <select id="ud-tx-direction" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All</option><option value="sent">Sent</option><option value="received">Received</option></select>
+      <select id="ud-tx-direction" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All directions</option><option value="sent">Sent</option><option value="received">Received</option></select>
+      <select id="ud-tx-type" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
       <select id="ud-tx-status" onchange="loadUserTransactions()" style="padding:8px;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
     </div>
     <div id="ud-transactions"></div>
@@ -717,6 +721,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <label>From Username</label>
       <input id="at-from" type="text" placeholder="Sender username" oninput="searchAdminRecipient('from', this.value)">
       <div id="from-suggestions" style="position:relative"></div>
+      <div id="from-selected" class="recipient-card" style="display:none"></div>
     </div>
   </div>
   <div class="form-row">
@@ -724,6 +729,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <label>To Username</label>
       <input id="at-to" type="text" placeholder="Recipient username" oninput="searchAdminRecipient('to', this.value)">
       <div id="to-suggestions" style="position:relative"></div>
+      <div id="to-selected" class="recipient-card" style="display:none"></div>
     </div>
   </div>
   <div class="form-row">
@@ -750,7 +756,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <button class="modal-close" onclick="closeModal('modal-admin-wallet')">✕</button>
   <h2 id="aw-title">Deposit Funds</h2>
   <p style="font-size:12px;color:var(--text3);margin-bottom:16px">This operation changes the selected user's balance and is recorded for anomaly monitoring.</p>
-  <div class="field"><label>User</label><input id="aw-user" type="text" placeholder="Username or public ID" oninput="searchWalletUser(this.value)"><div id="aw-suggestions" style="position:relative"></div></div>
+  <div class="field"><label>User</label><input id="aw-user" type="text" placeholder="Username or public ID" oninput="searchWalletUser(this.value)"><div id="aw-suggestions" style="position:relative"></div><div id="aw-selected" class="recipient-card" style="display:none"></div></div>
   <div class="field" style="margin-top:14px"><label>Amount (₹)</label><input id="aw-amount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
   <div class="field" style="margin-top:14px"><label>Reason</label><textarea id="aw-note" placeholder="Reason for this operation..."></textarea></div>
   <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="submitAdminWalletOperation()">Confirm</button><button class="btn btn-ghost" onclick="closeModal('modal-admin-wallet')">Cancel</button></div>
@@ -1253,18 +1259,20 @@ async function loadAdminOverview() {
 async function loadAllTx(page=1) {
   const suspicious = document.getElementById('tx-filter-suspicious')?.value;
   const status = document.getElementById('tx-filter-status')?.value;
+  const transactionType = document.getElementById('tx-filter-type')?.value;
   const search = document.getElementById('tx-search')?.value.trim();
   let txs = [];
   if (DEMO_MODE) {
     txs = getMockAllTx();
   } else {
-    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}${status ? `&status=${status}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}${status ? `&status=${status}` : ''}${transactionType ? `&transactionType=${transactionType}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
     const res = await apiFetch(`/transactions/all${query}`);
     if (!res) return;
     txs = res.transactions || [];
   }
   if (suspicious === 'true' && DEMO_MODE) txs = txs.filter(t=>t.suspicious);
   if (status && DEMO_MODE) txs = txs.filter(t=>t.status === status);
+  if (transactionType && DEMO_MODE) txs = txs.filter(t => (t.transactionType || 'transfer') === transactionType);
   if (search && DEMO_MODE) txs = txs.filter(t => `${t.fromName} ${t.toName} ${t.amount}`.toLowerCase().includes(search.toLowerCase()));
 
   document.getElementById('admin-tx-tbody').innerHTML = txs.map(tx=>`
@@ -1385,9 +1393,11 @@ async function loadUserTransactions() {
   const search = document.getElementById('ud-tx-search').value.trim();
   const direction = document.getElementById('ud-tx-direction').value;
   const status = document.getElementById('ud-tx-status').value;
+  const transactionType = document.getElementById('ud-tx-type').value;
   const query = new URLSearchParams({ userId: selectedAdminUser.id });
   if (search) query.set('search', search);
   if (status) query.set('status', status);
+  if (transactionType) query.set('transactionType', transactionType);
   const res = await apiFetch(`/transactions/all?${query}`);
   let txs = res?.transactions || [];
   if (DEMO_MODE) txs = getMockAllTx().filter(tx => tx.fromUserId === selectedAdminUser.id || tx.toUserId === selectedAdminUser.id);
@@ -1788,10 +1798,15 @@ function openAdminTransferModal() {
   document.getElementById('at-note').value = '';
   document.getElementById('from-suggestions').innerHTML = '';
   document.getElementById('to-suggestions').innerHTML = '';
+  selectedAdminUsers.from = null;
+  selectedAdminUsers.to = null;
   openModal('modal-admin-transfer');
 }
 
 let adminWalletOperation = 'deposit';
+const selectedAdminUsers = { from: null, to: null };
+let selectedWalletUser = null;
+const adminUserLookup = {};
 function openAdminWalletModal(operation) {
   adminWalletOperation = operation;
   document.getElementById('aw-title').textContent = operation === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds';
@@ -1799,21 +1814,36 @@ function openAdminWalletModal(operation) {
   document.getElementById('aw-amount').value = '';
   document.getElementById('aw-note').value = '';
   document.getElementById('aw-suggestions').innerHTML = '';
+  selectedWalletUser = null;
+  document.getElementById('aw-selected').style.display = 'none';
   openModal('modal-admin-wallet');
 }
 
 async function searchWalletUser(value) {
   const suggestions = document.getElementById('aw-suggestions');
+  selectedWalletUser = null;
   if (value.trim().length < 2) { suggestions.innerHTML = ''; return; }
   const users = DEMO_MODE ? MOCK_DB.users.filter(user => `${user.username} ${user.fullName}`.toLowerCase().includes(value.toLowerCase())) : (await apiFetch(`/users/search/${encodeURIComponent(value)}`) || []);
-  suggestions.innerHTML = users.length ? `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">${users.map(user => `<div onclick="document.getElementById('aw-user').value='${user.username}';document.getElementById('aw-suggestions').innerHTML=''" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border)"><strong>${user.fullName}</strong> <span class="mono">@${user.username} · ₹${fmt(user.balance)}</span></div>`).join('')}</div>` : '';
+  users.forEach(user => { adminUserLookup[user.username] = user; });
+  suggestions.innerHTML = users.length ? `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">${users.map(user => `<div onclick="selectWalletUser('${user.username}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border)"><strong>${user.fullName}</strong> <span class="mono">@${user.username} · ₹${fmt(user.balance)}</span></div>`).join('')}</div>` : '';
+}
+
+function selectWalletUser(username) {
+  selectedWalletUser = username;
+  document.getElementById('aw-user').value = username;
+  document.getElementById('aw-suggestions').innerHTML = '';
+  const user = adminUserLookup[username];
+  const selected = document.getElementById('aw-selected');
+  selected.innerHTML = `<strong>${user.fullName}</strong><br><span class="mono">ID: ${user.userCode || '—'} · Balance: ₹${fmt(user.balance)} · ${user.phone || 'No phone'}</span>`;
+  selected.style.display = 'block';
 }
 
 async function submitAdminWalletOperation() {
   const username = document.getElementById('aw-user').value.trim();
   const amount = Number(document.getElementById('aw-amount').value);
   const note = document.getElementById('aw-note').value.trim();
-  if (!username || !Number.isFinite(amount) || amount <= 0) { showToast('Select a user and enter a valid amount', 'error'); return; }
+  if (!selectedWalletUser || username !== selectedWalletUser) { showToast('User not found. Select a user from the suggestions first.', 'error'); return; }
+  if (!Number.isFinite(amount) || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
   if (DEMO_MODE) { showToast('Deposit/withdrawal demo completed', 'success'); closeModal('modal-admin-wallet'); return; }
   const res = await apiFetch('/transactions/admin-wallet-operation', 'POST', { username, amount, operation: adminWalletOperation, note });
   if (!res) return;
@@ -1825,6 +1855,8 @@ async function submitAdminWalletOperation() {
 
 async function searchAdminRecipient(field, val) {
   const suggEl = document.getElementById(field === 'from' ? 'from-suggestions' : 'to-suggestions');
+  selectedAdminUsers[field] = null;
+  document.getElementById(`${field}-selected`).style.display = 'none';
   if (val.length < 2) { suggEl.innerHTML = ''; return; }
   
   let users = [];
@@ -1836,6 +1868,7 @@ async function searchAdminRecipient(field, val) {
   }
 
   if (users.length === 0) { suggEl.innerHTML = ''; return; }
+  users.forEach(user => { adminUserLookup[user.username] = user; });
   suggEl.innerHTML = `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">
     ${users.map(u=>`<div onclick="selectAdminUser('${field}', '${u.username}')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
       <strong>${u.fullName}</strong> <span class="mono" style="color:var(--text3)">@${u.username} · ₹${fmt(u.balance)}</span>
@@ -1844,8 +1877,13 @@ async function searchAdminRecipient(field, val) {
 }
 
 function selectAdminUser(field, username) {
+  selectedAdminUsers[field] = username;
   document.getElementById(field === 'from' ? 'at-from' : 'at-to').value = username;
   document.getElementById(field === 'from' ? 'from-suggestions' : 'to-suggestions').innerHTML = '';
+  const user = adminUserLookup[username];
+  const selected = document.getElementById(`${field}-selected`);
+  selected.innerHTML = `<strong>${user.fullName}</strong><br><span class="mono">ID: ${user.userCode || '—'} · Balance: ₹${fmt(user.balance)} · ${user.phone || 'No phone'}</span>`;
+  selected.style.display = 'block';
 }
 
 async function submitAdminTransfer() {
@@ -1854,7 +1892,7 @@ async function submitAdminTransfer() {
   const amount = parseFloat(document.getElementById('at-amount').value);
   const note = document.getElementById('at-note').value.trim();
 
-  if (!from || !to) { showToast('Select both sender and recipient', 'error'); return; }
+  if (!selectedAdminUsers.from || from !== selectedAdminUsers.from || !selectedAdminUsers.to || to !== selectedAdminUsers.to) { showToast('User not found. Select both users from the suggestions first.', 'error'); return; }
   if (!amount || amount <= 0) { showToast('Enter a valid amount', 'error'); return; }
   if (from === to) { showToast('Cannot transfer to same user', 'error'); return; }
 
