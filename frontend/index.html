@@ -814,7 +814,12 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 // ═══════════════════════════════════════════════════════════
 // CONFIG — Backend API URL (injected by frontend server)
 // ═══════════════════════════════════════════════════════════
-const API_BASE = '__BACKEND_URL__';
+const injectedBackendUrl = '__BACKEND_URL__';
+const deployedBackendUrl = 'https://blockchain-backend-gx44.onrender.com/api';
+const isLocalFrontend = ['localhost', '127.0.0.1', '0.0.0.0'].includes(window.location.hostname);
+const API_BASE = injectedBackendUrl.startsWith('http') && (isLocalFrontend || !injectedBackendUrl.includes('localhost'))
+  ? injectedBackendUrl.replace(/\/$/, '')
+  : (isLocalFrontend ? 'http://localhost:5000/api' : deployedBackendUrl);
 
 let currentUser = null;
 let authToken = null;
