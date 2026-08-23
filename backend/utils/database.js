@@ -10,6 +10,7 @@ const schema = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL, email TEXT UNIQUE NOT NULL,
   password TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'user', full_name TEXT NOT NULL,
+  first_name TEXT DEFAULT '', surname TEXT DEFAULT '', gender TEXT DEFAULT '',
   wallet_address TEXT UNIQUE NOT NULL, user_code TEXT UNIQUE, balance NUMERIC(18,4) NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_login TIMESTAMPTZ,
   phone TEXT DEFAULT '', department TEXT DEFAULT '', transfer_blocked BOOLEAN NOT NULL DEFAULT FALSE,
@@ -57,6 +58,9 @@ async function initializeDatabase() {
   if (!pool) return false;
   await pool.query(schema);
   await pool.query("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT NOT NULL DEFAULT 'transfer'");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name TEXT DEFAULT ''");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS surname TEXT DEFAULT ''");
+  await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT ''");
   await seedUsersFromJson();
   return true;
 }
@@ -69,10 +73,10 @@ async function seedUsersFromJson() {
   const data = JSON.parse(fs.readFileSync(file, 'utf8'));
   for (const user of data.users || []) {
     await pool.query(`INSERT INTO users
-      (id, username, email, password, role, full_name, wallet_address, user_code, balance, status, created_at, last_login, phone, department, transfer_blocked, daily_limit, monthly_limit)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+      (id, username, email, password, role, full_name, first_name, surname, gender, wallet_address, user_code, balance, status, created_at, last_login, phone, department, transfer_blocked, daily_limit, monthly_limit)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       ON CONFLICT (id) DO NOTHING`, [user.id, user.username, user.email, user.password, user.role, user.fullName,
-      user.walletAddress, user.userCode || `${user.username}-${user.id.slice(-6)}`, user.balance || 0, user.status || 'active',
+      user.firstName || user.fullName.split(' ')[0], user.surname || '', user.gender || '', user.walletAddress, user.userCode || `${user.username}-${user.id.slice(-6)}`, user.balance || 0, user.status || 'active',
       user.createdAt || new Date(), user.lastLogin || null, user.phone || '', user.department || '', Boolean(user.transferBlocked),
       user.transferLimits?.daily ?? null, user.transferLimits?.monthly ?? null]);
   }

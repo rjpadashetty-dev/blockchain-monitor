@@ -35,7 +35,7 @@ function safeUser(user) {
   return {
     id: user.id, userCode: user.user_code, username: user.username, email: user.email, fullName: user.full_name,
     role: user.role, walletAddress: user.wallet_address, balance: Number(user.balance), phone: user.phone,
-    department: user.department, status: user.status, createdAt: user.created_at, lastLogin: user.last_login,
+    department: user.department, firstName: user.first_name || '', surname: user.surname || '', gender: user.gender || '', status: user.status, createdAt: user.created_at, lastLogin: user.last_login,
     transferBlocked: user.transfer_blocked, transferLimits: { daily: user.daily_limit === null ? null : Number(user.daily_limit), monthly: user.monthly_limit === null ? null : Number(user.monthly_limit) }
   };
 }
@@ -91,15 +91,15 @@ router.get('/admin/users', requireUser, requireAdmin, async (req, res) => {
 });
 
 router.post('/admin/users', requireUser, requireAdmin, async (req, res) => {
-  const { username, email, password, fullName, role = 'user', phone = '', department = '', balance = 0 } = req.body;
+  const { username, email, password, fullName, firstName, surname, gender, role = 'user', phone = '', department = '', balance = 0 } = req.body;
   if (!username || !email || !password || !fullName) return res.status(400).json({ error: 'Required fields missing' });
   const id = `user-${uuidv4().slice(0,8)}`;
   const userCode = `${username}-${Math.floor(100000 + Math.random() * 900000)}`;
   const walletAddress = '0x' + uuidv4().replace(/-/g, '').padEnd(40, '0').slice(0, 40);
   const hashed = await bcrypt.hash(password, 10);
   try {
-    const result = await database.query(`INSERT INTO users (id,username,email,password,role,full_name,wallet_address,user_code,balance,phone,department)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`, [id, username, email, hashed, role, fullName, walletAddress, userCode, Math.max(0, Number(balance) || 0), phone, department]);
+    const result = await database.query(`INSERT INTO users (id,username,email,password,role,full_name,first_name,surname,gender,wallet_address,user_code,balance,phone,department)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`, [id, username, email, hashed, role, fullName, firstName || fullName.split(' ')[0], surname || '', gender || '', walletAddress, userCode, Math.max(0, Number(balance) || 0), phone, department]);
     await recordAudit({ actor: req.user, action: 'user.create', entityType: 'user', entityId: id, metadata: { username, role }, req });
     res.status(201).json(safeUser(result.rows[0]));
   } catch (error) { res.status(409).json({ error: 'Username or email already exists' }); }

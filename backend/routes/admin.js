@@ -398,7 +398,7 @@ router.get('/users', (req, res) => {
 // ─── POST /api/admin/users ────────────────────────────────────────────────────
 router.post('/users', async (req, res) => {
   try {
-    const { username, email, password, fullName, role = 'user', phone, department, balance = 0 } = req.body;
+    const { username, email, password, fullName, firstName, surname, gender, role = 'user', phone, department, balance = 0 } = req.body;
 
     if (!username || !email || !password || !fullName) {
       return res.status(400).json({ error: 'Username, email, password and fullName are required' });
@@ -422,6 +422,9 @@ router.post('/users', async (req, res) => {
       password: hashed,
       role,
       fullName,
+      firstName: firstName || fullName.split(' ')[0],
+      surname: surname || '',
+      gender: gender || '',
       walletAddress,
       balance: Math.max(0, parseFloat(balance) || 0),
       status: 'active',

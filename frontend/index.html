@@ -680,6 +680,10 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <div class="field"><label>Username *</label><input id="nu-username" type="text" placeholder="username"></div>
   </div>
   <div class="form-row">
+    <div class="field"><label>Surname *</label><input id="nu-surname" type="text" placeholder="Surname"></div>
+    <div class="field"><label>Gender</label><select id="nu-gender"><option value="">Prefer not to say</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+  </div>
+  <div class="form-row">
     <div class="field"><label>Email *</label><input id="nu-email" type="email" placeholder="user@example.com"></div>
     <div class="field"><label>Password *</label><input id="nu-password" type="password" placeholder="min 6 chars"></div>
   </div>
@@ -1553,6 +1557,8 @@ function openAddUserModal() { openModal('modal-add-user'); }
 
 async function submitAddUser() {
   const fullName = document.getElementById('nu-fullname').value.trim();
+  const surname = document.getElementById('nu-surname').value.trim();
+  const gender = document.getElementById('nu-gender').value;
   const username = document.getElementById('nu-username').value.trim();
   const email = document.getElementById('nu-email').value.trim();
   const password = document.getElementById('nu-password').value;
@@ -1561,13 +1567,13 @@ async function submitAddUser() {
   const role = document.getElementById('nu-role').value;
   const balance = parseFloat(document.getElementById('nu-balance').value) || 0;
 
-  if (!fullName || !username || !email || !password) { showToast('Required fields missing', 'error'); return; }
+  if (!fullName || !surname || !username || !email || !password) { showToast('Full name, surname, username, email and password are required', 'error'); return; }
   if (password.length < 6) { showToast('Password min 6 characters', 'error'); return; }
 
   if (DEMO_MODE) {
     const newUser = {
       id: 'user-' + Date.now(),
-      username, email, fullName, role, phone, department, balance,
+      username, email, fullName: `${fullName} ${surname}`, firstName: fullName, surname, gender, role, phone, department, balance,
       status: 'active',
       walletAddress: '0x' + Array.from({length:40},()=>Math.floor(Math.random()*16).toString(16)).join(''),
       createdAt: new Date().toISOString(),
@@ -1577,17 +1583,19 @@ async function submitAddUser() {
     closeModal('modal-add-user');
     loadAdminUsers();
     showToast(`User ${fullName} created`, 'success');
-    ['nu-fullname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+    ['nu-fullname','nu-surname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('nu-gender').value = '';
     return;
   }
 
-  const payload = { username, email, password, fullName, role, phone, department, balance };
+  const payload = { username, email, password, fullName: `${fullName} ${surname}`, firstName: fullName, surname, gender, role, phone, department, balance };
   const res = await apiFetch('/admin/users', 'POST', payload);
   if (!res) return;
   closeModal('modal-add-user');
   loadAdminUsers();
   showToast(`User ${res.fullName} created`, 'success');
-  ['nu-fullname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+  ['nu-fullname','nu-surname','nu-username','nu-email','nu-password','nu-phone','nu-dept','nu-balance'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('nu-gender').value = '';
 }
 
 function openEditUserModal(u) {
