@@ -245,7 +245,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .balance-label { font-size:12px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); margin-bottom:4px; }
 
 /* Chart bars */
-.chart-bars { display:flex; align-items:flex-end; gap:8px; height:120px; padding-top:10px; }
+.chart-bars { display:flex; align-items:flex-end; gap:8px; height:150px; padding-top:10px; }
 .chart-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
 .chart-bar { width:100%; border-radius:4px 4px 0 0; transition:height 0.6s ease; min-height:2px; }
 .chart-bar.normal { background:linear-gradient(180deg, var(--primary), var(--primary-dim)); }
@@ -314,7 +314,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 
 .empty-state { text-align:center; padding:40px; color:var(--text3); }
 .empty-state .ico { font-size:40px; margin-bottom:12px; opacity:0.4; }
-.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
 @media(max-width:900px) { .grid-2 { grid-template-columns:1fr; } }
 </style>
 </head>
@@ -329,12 +329,12 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <div class="signal-row"><span class="signal-chip">↔ TRANSFERS</span><span class="signal-chip">$ RISK SCORING</span><span class="signal-chip">! LIVE ALERTS</span></div>
 </div>
 <div class="login-box">
-  <div class="login-logo">
+  <div class="login-logo" onclick="toggleAdminLogin()" role="button" tabindex="0" onkeypress="if(event.key==='Enter'||event.key===' ')toggleAdminLogin()" title="Click logo for Admin Portal">
     <div class="logo-mark" aria-label="TranzSafely security and transfer mark"><span class="coin">$</span><span class="transfer">↔</span><span class="shield">✓</span><span class="alert">!</span></div>
     <h1>TranzSafely</h1>
     <p>Smart Blockchain Security and Monitoring</p>
   </div>
-  <div class="login-tabs">
+  <div class="login-tabs" id="login-tabs" style="display:none">
     <button class="tab-btn active" onclick="setLoginTab('user')">👤 User Portal</button>
     <button class="tab-btn" onclick="setLoginTab('admin')">🛡️ Admin Portal</button>
   </div>
@@ -348,9 +348,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   </div>
   <button class="btn-login" id="login-btn" onclick="doLogin()">Sign In</button>
   <div class="error-msg" id="login-error"></div>
-  <div class="login-hint">
-    
-  </div>
+  <div class="login-hint"><span id="login-mode-hint">User Portal</span></div>
 </div>
 </div>
 
@@ -385,6 +383,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       <div class="devops-pill"><div class="dot yellow"></div>Monitoring: Running</div>
     </div>
     <div class="stats-grid" id="user-stats"></div>
+    <div class="card" id="user-financial-summary"></div>
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><h3>Recent Transactions</h3><span class="sub" onclick="showPage('page-history')" style="cursor:pointer;color:var(--primary)">View all →</span></div>
@@ -474,7 +473,13 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <div class="page" id="page-history">
     <div class="page-header"><h1>Transaction History</h1><p>All your blockchain transactions</p></div>
     <div class="card">
-      <div class="card-header"><h3>My Transactions</h3><span class="sub" id="tx-count">--</span></div>
+      <div class="card-header"><h3>My Transactions</h3><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><span class="sub" id="tx-count">--</span><button class="btn btn-primary" onclick="downloadStatement()" style="font-size:12px;padding:6px 12px">↓ Download Statement</button></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <input id="history-search" placeholder="Search party or amount" oninput="loadHistory(1)" style="flex:1;min-width:180px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <select id="history-type" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
+        <select id="history-status" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option><option value="pending">Pending</option></select>
+        <select id="history-risk" onchange="loadHistory(1)" style="padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All risk levels</option><option value="low">Low risk</option><option value="medium">Medium risk</option><option value="high">High risk</option></select>
+      </div>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Tx Hash</th><th>Type</th><th>Party</th><th>Amount</th><th>Fee</th><th>Status</th><th>Risk</th><th>Date</th></tr></thead>
@@ -499,6 +504,11 @@ tr:hover td { background:rgba(255,255,255,0.02); }
       </div>
       <div class="card"><div class="card-header"><h3>My Support Requests</h3></div><div id="my-help-requests"></div></div>
     </div>
+  </div>
+
+  <div class="page" id="page-notifications">
+    <div class="page-header"><h1>Notifications</h1><p>Recent account and transaction activity</p></div>
+    <div class="card"><div id="user-notifications"><div class="loading"><div class="spinner"></div> Loading...</div></div></div>
   </div>
 
   <!-- ── ADMIN PAGES ── -->
@@ -540,7 +550,6 @@ tr:hover td { background:rgba(255,255,255,0.02); }
           <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:170px">
           <select id="tx-filter-type" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All types</option><option value="transfer">Transfer</option><option value="deposit">Deposit</option><option value="withdrawal">Withdrawal</option></select>
           <select id="tx-filter-status" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
-          <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All</option><option value="true">Flagged only</option></select>
           <button class="btn btn-success" onclick="openAdminWalletModal('deposit')" style="font-size:12px;padding:6px 12px">+ Deposit</button>
           <button class="btn btn-danger" onclick="openAdminWalletModal('withdrawal')" style="font-size:12px;padding:6px 12px">- Withdraw</button>
           <button class="btn btn-primary" onclick="openAdminTransferModal()" style="font-size:12px;padding:6px 12px">+ Transfer</button>
@@ -697,6 +706,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
   <button class="modal-close" onclick="closeModal('modal-user-details')">✕</button>
   <h2 id="ud-title">User Details</h2>
   <div id="ud-profile" class="info-grid"></div>
+  <div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="ud-edit" class="btn btn-primary">Edit User</button></div>
   <div class="card" style="margin-top:20px;padding:16px;background:var(--bg2)">
     <div class="card-header"><h3>Transaction History</h3></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
@@ -707,7 +717,6 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     </div>
     <div id="ud-transactions"></div>
   </div>
-  <div style="display:flex;justify-content:flex-end;margin-top:16px"><button id="ud-edit" class="btn btn-primary">Edit User</button></div>
 </div>
 </div>
 
@@ -774,6 +783,12 @@ const API_BASE = '__BACKEND_URL__';
 let currentUser = null;
 let authToken = null;
 let currentLoginTab = 'user';
+function toggleAdminLogin() {
+  const tabs = document.getElementById('login-tabs');
+  const opening = tabs.style.display === 'none';
+  tabs.style.display = opening ? 'flex' : 'none';
+  setLoginTab(opening ? 'admin' : 'user');
+}
 let recipientDirectory = {};
 let selectedRecipient = null;
 let realtimeSocket = null;
@@ -785,7 +800,8 @@ const DEMO_MODE = false; // Set to true for testing with mock data
 function setLoginTab(tab) {
   currentLoginTab = tab;
   document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (i===0&&tab==='user')||(i===1&&tab==='admin')));
-  document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : 'junaid, rajesh, or sharanagouda';
+  document.getElementById('login-username').placeholder = tab === 'admin' ? 'admin' : '';
+  document.getElementById('login-mode-hint').textContent = tab === 'admin' ? 'Admin Portal · Logo access enabled' : 'User Portal';
 }
 
 async function doLogin() {
@@ -903,6 +919,7 @@ function buildSidebar() {
     <div class="nav-item" onclick="showPage('page-profile')"><span class="ico">◎</span> My Profile</div>
     <div class="nav-item" onclick="showPage('page-transfer')"><span class="ico">⇄</span> Transfer Funds</div>
     <div class="nav-item" onclick="showPage('page-history')"><span class="ico">◈</span> Transaction History</div>
+    <div class="nav-item" onclick="showPage('page-notifications')"><span class="ico">●</span> Notifications</div>
     <div class="nav-item" onclick="showPage('page-help')"><span class="ico">?</span> Help & Support</div>
   `;
   const adminNav = `
@@ -917,7 +934,7 @@ function buildSidebar() {
   `;
 
   nav.innerHTML = isAdmin ? adminNav : userNav;
-  document.querySelector('.sidebar-footer').innerHTML = `${isAdmin ? '' : '<button class="btn-logout" style="margin-bottom:8px" onclick="showPage(\'page-help\')">? Help & Support</button>'}<button class="btn-logout" onclick="doLogout()">⬡ Sign Out</button>`;
+  document.querySelector('.sidebar-footer').innerHTML = '<button class="btn-logout" onclick="doLogout()">⬡ Sign Out</button>';
 }
 
 function showPage(id) {
@@ -936,6 +953,7 @@ function showPage(id) {
     'page-profile': loadProfile,
     'page-transfer': loadTransferPage,
     'page-history': () => loadHistory(1),
+    'page-notifications': loadNotifications,
     'page-help': loadHelp,
     'page-admin-overview': loadAdminOverview,
     'page-admin-transactions': loadAllTx,
@@ -968,6 +986,14 @@ async function loadUserDashboard() {
     <div class="stat-card purple"><div class="ico">↑</div><div class="label">Total Sent</div><div class="value">₹${fmt(totalSent)}</div><div class="change">${myTxs.filter(t => t.fromUserId === currentUser.id).length} transactions</div></div>
     <div class="stat-card yellow"><div class="ico">⚡</div><div class="label">My Transactions</div><div class="value">${myTxs.length}</div><div class="change">${myTxs.filter(t => t.suspicious).length} flagged</div></div>
   `;
+  const netFlow = totalRecv - totalSent;
+  document.getElementById('user-financial-summary').innerHTML = `
+    <div class="card-header"><h3>Spending & Balance Summary</h3><span class="sub">All recorded activity</span></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+      <div><div class="balance-label">Current Balance</div><strong style="font-size:22px;color:var(--primary)">₹${fmt(currentUser.balance)}</strong></div>
+      <div><div class="balance-label">Total Spending</div><strong style="font-size:22px;color:var(--red)">₹${fmt(totalSent)}</strong></div>
+      <div><div class="balance-label">Net Flow</div><strong style="font-size:22px;color:${netFlow >= 0 ? 'var(--green)' : 'var(--red)'}">${netFlow >= 0 ? '+' : '-'}₹${fmt(Math.abs(netFlow))}</strong></div>
+    </div>`;
 
   const recent = myTxs.slice(0,5);
   if (recent.length === 0) {
@@ -1169,9 +1195,20 @@ async function loadHistory(page=1) {
     txs = res.transactions || [];
   }
   const myTxs = txs.filter(tx => tx.fromUserId === currentUser.id || tx.toUserId === currentUser.id);
-  document.getElementById('tx-count').textContent = `${myTxs.length} total`;
+  historyTransactions = myTxs;
+  const search = document.getElementById('history-search')?.value.trim().toLowerCase() || '';
+  const type = document.getElementById('history-type')?.value || '';
+  const status = document.getElementById('history-status')?.value || '';
+  const risk = document.getElementById('history-risk')?.value || '';
+  const filteredTxs = myTxs.filter(tx => {
+    const score = tx.suspicionScore || 0;
+    const riskLevel = score > 0.7 ? 'high' : score > 0.4 ? 'medium' : 'low';
+    const party = `${tx.toName || tx.toUsername || ''} ${tx.fromName || tx.fromUsername || ''} ${tx.amount}`.toLowerCase();
+    return (!search || party.includes(search)) && (!type || (tx.transactionType || 'transfer') === type) && (!status || tx.status === status) && (!risk || riskLevel === risk);
+  });
+  document.getElementById('tx-count').textContent = `${filteredTxs.length} of ${myTxs.length} total`;
 
-  document.getElementById('history-tbody').innerHTML = myTxs.slice((page-1)*10, page*10).map(tx => {
+  document.getElementById('history-tbody').innerHTML = filteredTxs.slice((page-1)*10, page*10).map(tx => {
     const isSender = tx.fromUserId === currentUser.id;
     const party = isSender ? (tx.toName || tx.toUsername) : (tx.fromName || tx.fromUsername);
     const score = tx.suspicionScore || 0;
@@ -1192,6 +1229,41 @@ async function loadHistory(page=1) {
       <td class="mono">${fmtDate(tx.timestamp)}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="8"><div class="empty-state"><div class="ico">◈</div><p>No transactions</p></div></td></tr>`;
+}
+
+let historyTransactions = [];
+function downloadStatement() {
+  if (!historyTransactions.length) { showToast('No transactions to download', 'warning'); return; }
+  const headers = ['Transaction Hash', 'Type', 'Party', 'Amount', 'Fee', 'Status', 'Risk', 'Date'];
+  const rows = historyTransactions.map(tx => {
+    const isSender = tx.fromUserId === currentUser.id;
+    const score = tx.suspicionScore || 0;
+    return [tx.txHash, tx.transactionType || 'transfer', isSender ? (tx.toName || tx.toUsername) : (tx.fromName || tx.fromUsername), `${isSender ? '-' : '+'}${tx.amount}`, tx.fee || 0, tx.status, `${(score * 100).toFixed(0)}%`, tx.timestamp];
+  });
+  const csv = [headers, ...rows].map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `tranzsafely-statement-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('Statement downloaded', 'success');
+}
+
+async function loadNotifications() {
+  let txs = [];
+  if (DEMO_MODE) txs = await getMockUserTx();
+  else {
+    const res = await apiFetch('/transactions/my?page=1&limit=1000');
+    if (!res) return;
+    txs = res.transactions || [];
+  }
+  const notifications = txs.filter(tx => tx.fromUserId === currentUser.id || tx.toUserId === currentUser.id).slice(0, 12).map(tx => {
+    const isSender = tx.fromUserId === currentUser.id;
+    const flagged = tx.status === 'flagged' || tx.suspicious;
+    return `<div style="display:flex;gap:12px;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border)"><span style="font-size:18px;color:${flagged ? 'var(--yellow)' : 'var(--primary)'}">${flagged ? '⚠' : '●'}</span><div><strong>${flagged ? 'Transaction flagged for review' : `Transaction ${isSender ? 'sent' : 'received'}`}</strong><div class="mono" style="margin-top:4px">${isSender ? 'To' : 'From'} ${isSender ? (tx.toName || tx.toUsername) : (tx.fromName || tx.fromUsername)} · ₹${fmt(tx.amount)} · ${fmtDate(tx.timestamp)}</div></div><span class="badge ${flagged ? 'pending' : 'confirmed'}" style="margin-left:auto">${flagged ? 'Review' : 'New'}</span></div>`;
+  });
+  document.getElementById('user-notifications').innerHTML = notifications.join('') || '<div class="empty-state"><div class="ico">●</div><p>No notifications yet</p></div>';
 }
 
 // ─────────────────── ADMIN OVERVIEW ───────────────────────
@@ -1257,7 +1329,6 @@ async function loadAdminOverview() {
 
 // ─────────────────── ADMIN TRANSACTIONS ───────────────────
 async function loadAllTx(page=1) {
-  const suspicious = document.getElementById('tx-filter-suspicious')?.value;
   const status = document.getElementById('tx-filter-status')?.value;
   const transactionType = document.getElementById('tx-filter-type')?.value;
   const search = document.getElementById('tx-search')?.value.trim();
@@ -1265,12 +1336,11 @@ async function loadAllTx(page=1) {
   if (DEMO_MODE) {
     txs = getMockAllTx();
   } else {
-    const query = `?page=${page}&limit=25${suspicious ? `&suspicious=${suspicious}` : ''}${status ? `&status=${status}` : ''}${transactionType ? `&transactionType=${transactionType}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
+    const query = `?page=${page}&limit=25${status ? `&status=${status}` : ''}${transactionType ? `&transactionType=${transactionType}` : ''}${search ? `&search=${encodeURIComponent(search)}` : ''}`;
     const res = await apiFetch(`/transactions/all${query}`);
     if (!res) return;
     txs = res.transactions || [];
   }
-  if (suspicious === 'true' && DEMO_MODE) txs = txs.filter(t=>t.suspicious);
   if (status && DEMO_MODE) txs = txs.filter(t=>t.status === status);
   if (transactionType && DEMO_MODE) txs = txs.filter(t => (t.transactionType || 'transfer') === transactionType);
   if (search && DEMO_MODE) txs = txs.filter(t => `${t.fromName} ${t.toName} ${t.amount}`.toLowerCase().includes(search.toLowerCase()));
