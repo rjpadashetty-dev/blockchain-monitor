@@ -538,6 +538,8 @@ tr:hover td { background:rgba(255,255,255,0.02); }
           <input id="tx-search" placeholder="Search user or amount" oninput="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;width:170px">
           <select id="tx-filter-status" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All statuses</option><option value="confirmed">Confirmed</option><option value="flagged">Flagged</option></select>
           <select id="tx-filter-suspicious" onchange="loadAllTx()" style="padding:6px 10px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"><option value="">All</option><option value="true">Flagged only</option></select>
+          <button class="btn btn-success" onclick="openAdminWalletModal('deposit')" style="font-size:12px;padding:6px 12px">+ Deposit</button>
+          <button class="btn btn-danger" onclick="openAdminWalletModal('withdrawal')" style="font-size:12px;padding:6px 12px">- Withdraw</button>
           <button class="btn btn-primary" onclick="openAdminTransferModal()" style="font-size:12px;padding:6px 12px">+ Transfer</button>
         </div>
       </div>
@@ -740,6 +742,18 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <button class="btn btn-primary" onclick="submitAdminTransfer()">Execute Transfer</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-admin-transfer')">Cancel</button>
   </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="modal-admin-wallet">
+<div class="modal">
+  <button class="modal-close" onclick="closeModal('modal-admin-wallet')">✕</button>
+  <h2 id="aw-title">Deposit Funds</h2>
+  <p style="font-size:12px;color:var(--text3);margin-bottom:16px">This operation changes the selected user's balance and is recorded for anomaly monitoring.</p>
+  <div class="field"><label>User</label><input id="aw-user" type="text" placeholder="Username or public ID" oninput="searchWalletUser(this.value)"><div id="aw-suggestions" style="position:relative"></div></div>
+  <div class="field" style="margin-top:14px"><label>Amount (₹)</label><input id="aw-amount" type="number" min="0.01" step="0.01" placeholder="0.00"></div>
+  <div class="field" style="margin-top:14px"><label>Reason</label><textarea id="aw-note" placeholder="Reason for this operation..."></textarea></div>
+  <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-primary" onclick="submitAdminWalletOperation()">Confirm</button><button class="btn btn-ghost" onclick="closeModal('modal-admin-wallet')">Cancel</button></div>
 </div>
 </div>
 
@@ -1158,7 +1172,7 @@ async function loadHistory(page=1) {
     const fillColor = score > 0.7 ? 'var(--red)' : score > 0.4 ? 'var(--yellow)' : 'var(--green)';
     return `<tr>
       <td><span class="mono truncate" title="${tx.txHash}">${tx.txHash.slice(0,16)}...</span></td>
-      <td><span style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'▲ Sent':'▼ Recv'}</span></td>
+      <td><span style="color:${tx.transactionType==='deposit'?'var(--green)':tx.transactionType==='withdrawal'?'var(--red)':isSender?'var(--red)':'var(--green)'}">${tx.transactionType === 'deposit' ? '＋ Deposit' : tx.transactionType === 'withdrawal' ? '− Withdraw' : isSender ? '▲ Sent' : '▼ Recv'}</span></td>
       <td>${party}</td>
       <td class="mono" style="color:${isSender?'var(--red)':'var(--green)'}">${isSender?'-':'+'}₹${fmt(tx.amount)}</td>
       <td class="mono">₹${tx.fee}</td>
@@ -1775,6 +1789,38 @@ function openAdminTransferModal() {
   document.getElementById('from-suggestions').innerHTML = '';
   document.getElementById('to-suggestions').innerHTML = '';
   openModal('modal-admin-transfer');
+}
+
+let adminWalletOperation = 'deposit';
+function openAdminWalletModal(operation) {
+  adminWalletOperation = operation;
+  document.getElementById('aw-title').textContent = operation === 'deposit' ? 'Deposit Funds' : 'Withdraw Funds';
+  document.getElementById('aw-user').value = '';
+  document.getElementById('aw-amount').value = '';
+  document.getElementById('aw-note').value = '';
+  document.getElementById('aw-suggestions').innerHTML = '';
+  openModal('modal-admin-wallet');
+}
+
+async function searchWalletUser(value) {
+  const suggestions = document.getElementById('aw-suggestions');
+  if (value.trim().length < 2) { suggestions.innerHTML = ''; return; }
+  const users = DEMO_MODE ? MOCK_DB.users.filter(user => `${user.username} ${user.fullName}`.toLowerCase().includes(value.toLowerCase())) : (await apiFetch(`/users/search/${encodeURIComponent(value)}`) || []);
+  suggestions.innerHTML = users.length ? `<div style="position:absolute;top:4px;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;z-index:10;overflow:hidden">${users.map(user => `<div onclick="document.getElementById('aw-user').value='${user.username}';document.getElementById('aw-suggestions').innerHTML=''" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border)"><strong>${user.fullName}</strong> <span class="mono">@${user.username} · ₹${fmt(user.balance)}</span></div>`).join('')}</div>` : '';
+}
+
+async function submitAdminWalletOperation() {
+  const username = document.getElementById('aw-user').value.trim();
+  const amount = Number(document.getElementById('aw-amount').value);
+  const note = document.getElementById('aw-note').value.trim();
+  if (!username || !Number.isFinite(amount) || amount <= 0) { showToast('Select a user and enter a valid amount', 'error'); return; }
+  if (DEMO_MODE) { showToast('Deposit/withdrawal demo completed', 'success'); closeModal('modal-admin-wallet'); return; }
+  const res = await apiFetch('/transactions/admin-wallet-operation', 'POST', { username, amount, operation: adminWalletOperation, note });
+  if (!res) return;
+  closeModal('modal-admin-wallet');
+  showToast(res.warning || `${adminWalletOperation === 'deposit' ? 'Deposit' : 'Withdrawal'} completed. New balance: ₹${fmt(res.newBalance)}`, res.warning ? 'warning' : 'success');
+  loadAdminOverview();
+  loadAllTx();
 }
 
 async function searchAdminRecipient(field, val) {

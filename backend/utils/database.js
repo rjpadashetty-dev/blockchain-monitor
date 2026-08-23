@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   block_number BIGINT, timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(), note TEXT DEFAULT '',
   suspicion_score NUMERIC(5,4) DEFAULT 0, suspicious BOOLEAN NOT NULL DEFAULT FALSE,
   suspicion_reasons JSONB NOT NULL DEFAULT '[]', severity TEXT DEFAULT 'low', chain TEXT DEFAULT 'internal',
+  transaction_type TEXT NOT NULL DEFAULT 'transfer',
   address_risk JSONB NOT NULL DEFAULT '{}'::jsonb
 );
 CREATE TABLE IF NOT EXISTS alerts (
@@ -55,6 +56,7 @@ CREATE INDEX IF NOT EXISTS help_requests_status_idx ON help_requests(status, cre
 async function initializeDatabase() {
   if (!pool) return false;
   await pool.query(schema);
+  await pool.query("ALTER TABLE transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT NOT NULL DEFAULT 'transfer'");
   await seedUsersFromJson();
   return true;
 }

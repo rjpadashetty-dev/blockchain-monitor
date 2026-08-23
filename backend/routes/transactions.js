@@ -290,6 +290,23 @@ router.post('/admin-transfer', authenticateToken, requireAdmin, async (req, res)
   }
 });
 
+router.post('/admin-wallet-operation', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { username, amount, operation, note } = req.body;
+    const numericAmount = Number(amount);
+    if (!username || !Number.isFinite(numericAmount) || numericAmount <= 0 || !['deposit', 'withdrawal'].includes(operation)) return res.status(400).json({ error: 'User, valid amount and operation are required' });
+    const user = db.get('users').find(u => u.username === username || u.userCode === username).value();
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (operation === 'withdrawal' && user.balance < numericAmount) return res.status(400).json({ error: 'Insufficient balance' });
+    const analysis = analyzeTransaction({ fromUserId: user.id, toUserId: user.id, amount: numericAmount, timestamp: new Date().toISOString() });
+    const transaction = { id: `tx-${uuidv4().slice(0, 8)}`, txHash: `internal-${uuidv4()}`, fromUserId: user.id, toUserId: user.id, fromAddress: user.walletAddress, toAddress: user.walletAddress, amount: numericAmount, fee: 0, status: analysis.suspicious ? 'flagged' : 'confirmed', blockNumber: null, timestamp: new Date().toISOString(), note: `[ADMIN ${operation.toUpperCase()}] ${note || ''}`.trim(), transactionType: operation, ...analysis };
+    db.get('users').find({ id: user.id }).assign({ balance: parseFloat((user.balance + (operation === 'deposit' ? numericAmount : -numericAmount)).toFixed(4)) }).write();
+    db.get('transactions').push(transaction).write();
+    if (analysis.suspicious) db.get('alerts').push({ id: `alert-${uuidv4().slice(0, 8)}`, type: `${operation}_review`, severity: analysis.severity, transactionId: transaction.id, userId: user.id, message: `Suspicious ${operation} detected: ${analysis.suspicionReasons.join(', ')}`, timestamp: new Date().toISOString(), resolved: false, resolvedBy: null, resolvedAt: null }).write();
+    res.json({ success: true, transaction, newBalance: db.get('users').find({ id: user.id }).value().balance, warning: analysis.suspicious ? `${operation} flagged for review` : null });
+  } catch (error) { console.error('Wallet operation error:', error); res.status(500).json({ error: 'Wallet operation failed' }); }
+});
+
 // ─── GET /api/transactions/all (admin) ───────────────────────────────────────
 router.get('/all', authenticateToken, requireAdmin, (req, res) => {
   const { page = 1, limit = 25, suspicious, userId } = req.query;

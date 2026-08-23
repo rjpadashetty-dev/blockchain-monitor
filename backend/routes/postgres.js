@@ -43,7 +43,8 @@ function safeUser(user) {
 function safeTransaction(row) {
   return { ...row, amount: Number(row.amount), fee: Number(row.fee), suspicionScore: Number(row.suspicion_score || 0),
     txHash: row.tx_hash, fromUserId: row.from_user_id, toUserId: row.to_user_id, fromAddress: row.from_address,
-    toAddress: row.to_address, blockNumber: row.block_number, timestamp: row.timestamp, suspicionReasons: row.suspicion_reasons || [] };
+    toAddress: row.to_address, blockNumber: row.block_number, timestamp: row.timestamp, suspicionReasons: row.suspicion_reasons || [],
+    transactionType: row.transaction_type || 'transfer' };
 }
 
 router.post('/auth/login', async (req, res) => {
@@ -233,6 +234,32 @@ router.post('/transactions/admin-transfer', requireUser, requireAdmin, async (re
     await client.query('COMMIT');
     res.json({ success: true, transaction: safeTransaction(inserted.rows[0]), warning: analysis.suspicious ? 'Transfer flagged for review' : null });
   } catch (error) { await client.query('ROLLBACK'); res.status(500).json({ error: error.message || 'Transfer failed' }); }
+  finally { client.release(); }
+});
+
+router.post('/transactions/admin-wallet-operation', requireUser, requireAdmin, async (req, res) => {
+  const { username, amount, operation, note } = req.body;
+  const numericAmount = Number(amount);
+  if (!username || !Number.isFinite(numericAmount) || numericAmount <= 0 || !['deposit', 'withdrawal'].includes(operation)) return res.status(400).json({ error: 'User, valid amount and operation are required' });
+  const client = await database.getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const userResult = await client.query('SELECT * FROM users WHERE username=$1 OR user_code=$1 FOR UPDATE', [username]);
+    const user = userResult.rows[0];
+    if (!user) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'User not found' }); }
+    if (operation === 'withdrawal' && Number(user.balance) < numericAmount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Insufficient balance' }); }
+    const analysis = analyzeTransaction({ fromUserId: user.id, toUserId: user.id, amount: numericAmount, timestamp: new Date().toISOString() });
+    const id = `tx-${uuidv4().slice(0, 8)}`;
+    const type = operation === 'deposit' ? 'deposit' : 'withdrawal';
+    const inserted = await client.query(`INSERT INTO transactions (id,tx_hash,from_user_id,to_user_id,from_address,to_address,amount,fee,status,note,suspicion_score,suspicious,suspicion_reasons,severity,chain,transaction_type)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,0,$8,$9,$10,$11,$12,$13,'internal',$14) RETURNING *`, [id, `internal-${uuidv4()}`, user.id, user.id, user.wallet_address, user.wallet_address, numericAmount, analysis.suspicious ? 'flagged' : 'confirmed', `[ADMIN ${type.toUpperCase()}] ${note || ''}`.trim(), analysis.suspicionScore, analysis.suspicious, JSON.stringify(analysis.suspicionReasons), analysis.severity, type]);
+    const delta = operation === 'deposit' ? numericAmount : -numericAmount;
+    await client.query('UPDATE users SET balance=balance+$1 WHERE id=$2', [delta, user.id]);
+    if (analysis.suspicious) await client.query('INSERT INTO alerts (id,type,severity,transaction_id,user_id,message) VALUES ($1,$2,$3,$4,$5,$6)', [`alert-${uuidv4().slice(0,8)}`, `${type}_review`, analysis.severity, id, user.id, `Suspicious ${type} detected: ${analysis.suspicionReasons.join(', ')}`]);
+    await client.query('COMMIT');
+    const balance = await database.query('SELECT balance FROM users WHERE id=$1', [user.id]);
+    res.json({ success: true, transaction: safeTransaction(inserted.rows[0]), newBalance: Number(balance.rows[0].balance), warning: analysis.suspicious ? `${type} flagged for review` : null });
+  } catch (error) { await client.query('ROLLBACK'); res.status(500).json({ error: error.message || 'Wallet operation failed' }); }
   finally { client.release(); }
 });
 
