@@ -260,6 +260,14 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .chart-bar.normal { background:linear-gradient(180deg, var(--primary), var(--primary-dim)); }
 .chart-bar.suspicious { background:linear-gradient(180deg, var(--red), #b91c1c); }
 .chart-label { font-size:9px; color:var(--text3); font-family:var(--mono); text-align:center; }
+.monthly-chart { display:flex; align-items:flex-end; gap:10px; height:150px; padding:12px 4px 0; border-bottom:1px solid var(--border); }
+.monthly-bar-wrap { flex:1; min-width:0; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; }
+.monthly-bars { width:100%; height:110px; display:flex; align-items:flex-end; justify-content:center; gap:4px; }
+.monthly-bar { width:36%; min-height:3px; border-radius:4px 4px 0 0; transition:height .5s ease; }
+.monthly-bar.sent { background:linear-gradient(180deg,var(--red),#b91c1c); }
+.monthly-bar.received { background:linear-gradient(180deg,var(--green),#047857); }
+.monthly-legend { display:flex; gap:16px; margin-top:12px; color:var(--text3); font:11px var(--mono); }
+.overview-chart-card { align-self:start; height:auto; }
 
 /* Profile info grid */
 .info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; }
@@ -410,6 +418,11 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     </div>
     <div class="stats-grid" id="user-stats"></div>
     <div class="card" id="user-financial-summary"></div>
+    <div class="card">
+      <div class="card-header"><h3>Monthly Activity</h3><span class="sub">Sent and received</span></div>
+      <div class="monthly-chart" id="user-monthly-chart"></div>
+      <div class="monthly-legend"><span><span style="color:var(--red)">■</span> Sent</span><span><span style="color:var(--green)">■</span> Received</span></div>
+    </div>
     <div class="grid-2">
       <div class="card">
         <div class="card-header"><h3>Recent Transactions</h3><span class="sub" onclick="showPage('page-history')" style="cursor:pointer;color:var(--primary)">View all →</span></div>
@@ -555,7 +568,7 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     </div>
     <div class="stats-grid" id="admin-stats"></div>
     <div class="grid-2">
-      <div class="card">
+      <div class="card overview-chart-card">
         <div class="card-header"><h3>Transaction Volume (7 days)</h3></div>
         <div class="chart-bars" id="admin-chart"></div>
         <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;font-family:var(--mono)">
@@ -1073,6 +1086,22 @@ async function loadUserDashboard() {
       <div><div class="balance-label">Total Received (This Month)</div><strong style="font-size:22px;color:var(--green)">₹${fmt(monthlyReceived)}</strong></div>
       <div><div class="balance-label">Net Flow (This Month)</div><strong style="font-size:22px;color:${monthlyNetFlow >= 0 ? 'var(--green)' : 'var(--red)'}">${monthlyNetFlow >= 0 ? '+' : '-'}₹${fmt(Math.abs(monthlyNetFlow))}</strong></div>
     </div>`;
+  const monthlyTotals = {};
+  myTxs.forEach(tx => {
+    const timestamp = new Date(tx.timestamp);
+    if (Number.isNaN(timestamp.getTime())) return;
+    const monthKey = `${timestamp.getUTCFullYear()}-${String(timestamp.getUTCMonth() + 1).padStart(2, '0')}`;
+    if (!monthlyTotals[monthKey]) monthlyTotals[monthKey] = { sent: 0, received: 0 };
+    if (tx.fromUserId === currentUser.id) monthlyTotals[monthKey].sent += Number(tx.amount || 0);
+    if (tx.toUserId === currentUser.id) monthlyTotals[monthKey].received += Number(tx.amount || 0);
+  });
+  const monthKeys = Object.keys(monthlyTotals).sort().slice(-6);
+  const chartMax = Math.max(...monthKeys.map(key => Math.max(monthlyTotals[key].sent, monthlyTotals[key].received)), 1);
+  document.getElementById('user-monthly-chart').innerHTML = monthKeys.length ? monthKeys.map(key => {
+    const totals = monthlyTotals[key];
+    const label = new Date(`${key}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short' });
+    return `<div class="monthly-bar-wrap"><div class="monthly-bars" title="${label}: Sent ₹${fmt(totals.sent)}, Received ₹${fmt(totals.received)}"><div class="monthly-bar sent" style="height:${Math.max(3, totals.sent / chartMax * 110)}px"></div><div class="monthly-bar received" style="height:${Math.max(3, totals.received / chartMax * 110)}px"></div></div><div class="chart-label">${label}</div></div>`;
+  }).join('') : '<div class="empty-state" style="width:100%;padding:25px">No monthly activity</div>';
 
   const recent = myTxs.slice(0,5);
   if (recent.length === 0) {
