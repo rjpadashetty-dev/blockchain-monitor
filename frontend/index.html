@@ -254,9 +254,14 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .balance-label { font-size:12px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-family:var(--mono); margin-bottom:4px; }
 
 /* Chart bars */
-.chart-bars { display:flex; align-items:flex-end; gap:8px; height:150px; padding-top:10px; }
+.chart-bars { display:flex; align-items:flex-end; gap:8px; height:260px; padding-top:10px; flex:1; min-height:180px; }
 .chart-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
-.chart-bar { width:100%; border-radius:4px 4px 0 0; transition:height 0.6s ease; min-height:2px; }
+.chart-bar { width:100%; border-radius:4px 4px 0 0; transition:height 0.6s ease; min-height:2px; position:relative; cursor:help; }
+.chart-bar[data-tooltip]::after, .monthly-bar[data-tooltip]::after { content:attr(data-tooltip); position:absolute; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%) translateY(4px); width:max-content; max-width:220px; padding:8px 10px; border:1px solid var(--border2); border-radius:7px; background:var(--bg2); color:var(--text); font:11px var(--mono); line-height:1.4; text-align:left; opacity:0; pointer-events:none; z-index:20; box-shadow:0 8px 20px rgba(0,0,0,.35); transition:opacity .18s,transform .18s; }
+.chart-bar[data-tooltip]::before, .monthly-bar[data-tooltip]::before { content:''; position:absolute; left:50%; bottom:calc(100% + 4px); width:6px; height:6px; border-radius:50%; transform:translateX(-50%); opacity:0; z-index:21; transition:opacity .18s; }
+.chart-bar[data-tooltip]:hover::after, .chart-bar[data-tooltip]:hover::before, .monthly-bar[data-tooltip]:hover::after, .monthly-bar[data-tooltip]:hover::before { opacity:1; transform:translateX(-50%) translateY(0); }
+.chart-bar.normal[data-tooltip]::before, .monthly-bar.received[data-tooltip]::before { background:var(--green); box-shadow:0 0 8px var(--green); }
+.chart-bar.suspicious[data-tooltip]::before, .monthly-bar.sent[data-tooltip]::before { background:var(--red); box-shadow:0 0 8px var(--red); }
 .chart-bar.normal { background:linear-gradient(180deg, var(--primary), var(--primary-dim)); }
 .chart-bar.suspicious { background:linear-gradient(180deg, var(--red), #b91c1c); }
 .chart-label { font-size:9px; color:var(--text3); font-family:var(--mono); text-align:center; }
@@ -267,7 +272,8 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .monthly-bar.sent { background:linear-gradient(180deg,var(--red),#b91c1c); }
 .monthly-bar.received { background:linear-gradient(180deg,var(--green),#047857); }
 .monthly-legend { display:flex; gap:16px; margin-top:12px; color:var(--text3); font:11px var(--mono); }
-.overview-chart-card { align-self:start; height:auto; }
+.overview-chart-card { align-self:stretch; height:auto; display:flex; flex-direction:column; }
+.overview-chart-card .chart-bars { align-items:flex-end; }
 
 /* Profile info grid */
 .info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; }
@@ -419,9 +425,9 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <div class="stats-grid" id="user-stats"></div>
     <div class="card" id="user-financial-summary"></div>
     <div class="card">
-      <div class="card-header"><h3>Monthly Activity</h3><span class="sub">Sent and received</span></div>
+      <div class="card-header"><h3>Monthly Activity</h3><span class="sub">Confirmed and flagged</span></div>
       <div class="monthly-chart" id="user-monthly-chart"></div>
-      <div class="monthly-legend"><span><span style="color:var(--red)">■</span> Sent</span><span><span style="color:var(--green)">■</span> Received</span></div>
+      <div class="monthly-legend"><span><span style="color:var(--green)">■</span> Confirmed</span><span><span style="color:var(--red)">■</span> Flagged</span></div>
     </div>
     <div class="grid-2">
       <div class="card">
@@ -1091,16 +1097,15 @@ async function loadUserDashboard() {
     const timestamp = new Date(tx.timestamp);
     if (Number.isNaN(timestamp.getTime())) return;
     const monthKey = `${timestamp.getUTCFullYear()}-${String(timestamp.getUTCMonth() + 1).padStart(2, '0')}`;
-    if (!monthlyTotals[monthKey]) monthlyTotals[monthKey] = { sent: 0, received: 0 };
-    if (tx.fromUserId === currentUser.id) monthlyTotals[monthKey].sent += Number(tx.amount || 0);
-    if (tx.toUserId === currentUser.id) monthlyTotals[monthKey].received += Number(tx.amount || 0);
+    if (!monthlyTotals[monthKey]) monthlyTotals[monthKey] = { confirmed: 0, flagged: 0 };
+    monthlyTotals[monthKey][tx.status === 'flagged' || tx.suspicious ? 'flagged' : 'confirmed'] += Number(tx.amount || 0);
   });
   const monthKeys = Object.keys(monthlyTotals).sort().slice(-6);
-  const chartMax = Math.max(...monthKeys.map(key => Math.max(monthlyTotals[key].sent, monthlyTotals[key].received)), 1);
+  const chartMax = Math.max(...monthKeys.map(key => Math.max(monthlyTotals[key].confirmed, monthlyTotals[key].flagged)), 1);
   document.getElementById('user-monthly-chart').innerHTML = monthKeys.length ? monthKeys.map(key => {
     const totals = monthlyTotals[key];
     const label = new Date(`${key}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short' });
-    return `<div class="monthly-bar-wrap"><div class="monthly-bars" title="${label}: Sent ₹${fmt(totals.sent)}, Received ₹${fmt(totals.received)}"><div class="monthly-bar sent" style="height:${Math.max(3, totals.sent / chartMax * 110)}px"></div><div class="monthly-bar received" style="height:${Math.max(3, totals.received / chartMax * 110)}px"></div></div><div class="chart-label">${label}</div></div>`;
+    return `<div class="monthly-bar-wrap"><div class="monthly-bars"><div class="monthly-bar received" data-tooltip="${label} · Confirmed: ₹${fmt(totals.confirmed)}" style="height:${Math.max(3, totals.confirmed / chartMax * 110)}px"></div><div class="monthly-bar sent" data-tooltip="${label} · Flagged: ₹${fmt(totals.flagged)}" style="height:${Math.max(3, totals.flagged / chartMax * 110)}px"></div></div><div class="chart-label">${label}</div></div>`;
   }).join('') : '<div class="empty-state" style="width:100%;padding:25px">No monthly activity</div>';
 
   const recent = myTxs.slice(0,5);
@@ -1419,11 +1424,11 @@ async function loadAdminOverview() {
 
   // Chart
   const chart = data.chartData;
-  const maxVol = Math.max(...chart.map(d=>d.volume), 1);
+  const maxVol = Math.max(...chart.map(d=>Math.max(Number(d.volume || 0) - Number(d.suspiciousVolume || 0), Number(d.suspiciousVolume || 0))), 1);
   document.getElementById('admin-chart').innerHTML = chart.map(d=>`
     <div class="chart-bar-wrap">
-      <div class="chart-bar normal" style="height:${Math.max(4,(d.volume/maxVol)*100)}px" title="₹${fmt(d.volume)}"></div>
-      ${d.suspicious>0?`<div class="chart-bar suspicious" style="height:${Math.max(4,(d.suspicious/Math.max(...chart.map(c=>c.suspicious),1))*40)}px" title="${d.suspicious} suspicious"></div>`:''}
+      <div class="chart-bar normal" data-tooltip="${d.date} · Confirmed/Normal: ₹${fmt(Number(d.volume || 0) - Number(d.suspiciousVolume || 0))}" style="height:${Math.max(4,((Number(d.volume || 0) - Number(d.suspiciousVolume || 0))/maxVol)*100)}px"></div>
+      ${d.suspicious>0?`<div class="chart-bar suspicious" data-tooltip="${d.date} · Flagged/Suspicious: ₹${fmt(d.suspiciousVolume || 0)} (${d.suspicious} transaction(s))" style="height:${Math.max(4,(Number(d.suspiciousVolume || 0)/maxVol)*100)}px"></div>`:''}
       <div class="chart-label">${d.date.slice(5)}</div>
     </div>
   `).join('');

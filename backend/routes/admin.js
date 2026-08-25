@@ -346,6 +346,7 @@ router.get('/overview', (req, res) => {
       date: dateStr,
       count: dayTxs.length,
       volume: dayTxs.reduce((s, tx) => s + tx.amount, 0),
+      suspiciousVolume: dayTxs.filter(tx => tx.suspicious).reduce((s, tx) => s + tx.amount, 0),
       suspicious: dayTxs.filter(tx => tx.suspicious).length
     });
   }

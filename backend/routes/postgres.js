@@ -160,13 +160,13 @@ router.get('/admin/overview', requireUser, requireAdmin, async (req, res) => {
       FROM transactions t JOIN users fu ON fu.id=t.from_user_id JOIN users tu ON tu.id=t.to_user_id ORDER BY t.timestamp DESC LIMIT 5`)
   ]);
   const chartResult = await database.query(`SELECT TO_CHAR(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
-    COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS volume, COUNT(*) FILTER (WHERE suspicious)::int AS suspicious
+    COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS volume, COALESCE(SUM(amount) FILTER (WHERE suspicious),0) AS "suspiciousVolume", COUNT(*) FILTER (WHERE suspicious)::int AS suspicious
     FROM transactions WHERE timestamp >= NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1`);
   res.json({
     stats: { totalUsers: users.rows[0].total, activeUsers: users.rows[0].active, totalTransactions: txs.rows[0].total,
       totalVolume: Number(txs.rows[0].volume), suspiciousTransactions: txs.rows[0].suspicious,
       confirmedTxs: txs.rows[0].confirmed, flaggedTxs: txs.rows[0].flagged, unresolvedAlerts: alerts.rows[0].unresolved },
-    chartData: chartResult.rows.map(row => ({ ...row, volume: Number(row.volume) })),
+    chartData: chartResult.rows.map(row => ({ ...row, volume: Number(row.volume), suspiciousVolume: Number(row.suspiciousVolume) })),
     recentAlerts: recentAlerts.rows,
     recentTransactions: recentTransactions.rows.map(safeTransaction)
   });
