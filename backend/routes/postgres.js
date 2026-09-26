@@ -47,6 +47,23 @@ function safeTransaction(row) {
     transactionType: row.transaction_type || 'transfer' };
 }
 
+function getOverviewChartRange(query) {
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const toValue = query.to || todayUtc.toISOString().slice(0, 10);
+  const defaultFrom = new Date(todayUtc);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 6);
+  const fromValue = query.from || defaultFrom.toISOString().slice(0, 10);
+  const groupBy = ['day', 'week', 'month', 'year'].includes(query.groupBy) ? query.groupBy : 'day';
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const from = datePattern.test(fromValue) ? new Date(`${fromValue}T00:00:00.000Z`) : new Date(NaN);
+  const to = datePattern.test(toValue) ? new Date(`${toValue}T00:00:00.000Z`) : new Date(NaN);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return null;
+  const endExclusive = new Date(to);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  return { from: from.toISOString(), endExclusive: endExclusive.toISOString(), groupBy };
+}
+
 router.post('/auth/login', async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username and password are required' });
@@ -146,6 +163,8 @@ router.delete('/admin/watched-addresses/:address', requireUser, requireAdmin, as
 });
 
 router.get('/admin/overview', requireUser, requireAdmin, async (req, res) => {
+  const chartRange = getOverviewChartRange(req.query);
+  if (!chartRange) return res.status(400).json({ error: 'Invalid chart date range' });
   const [users, txs, alerts, recentAlerts, recentTransactions] = await Promise.all([
     database.query(`SELECT COUNT(*) FILTER (WHERE role='user')::int AS total, COUNT(*) FILTER (WHERE role='user' AND status='active')::int AS active FROM users`),
     database.query(`SELECT COUNT(*)::int AS total, COALESCE(SUM(amount),0) AS volume,
@@ -159,9 +178,10 @@ router.get('/admin/overview', requireUser, requireAdmin, async (req, res) => {
     database.query(`SELECT t.*, fu.username AS "fromUsername", fu.full_name AS "fromName", tu.username AS "toUsername", tu.full_name AS "toName"
       FROM transactions t JOIN users fu ON fu.id=t.from_user_id JOIN users tu ON tu.id=t.to_user_id ORDER BY t.timestamp DESC LIMIT 5`)
   ]);
-  const chartResult = await database.query(`SELECT TO_CHAR(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date,
+  const chartResult = await database.query(`SELECT TO_CHAR(date_trunc($1, timestamp AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS date,
     COUNT(*)::int AS count, COALESCE(SUM(amount),0) AS volume, COALESCE(SUM(amount) FILTER (WHERE suspicious),0) AS "suspiciousVolume", COUNT(*) FILTER (WHERE suspicious)::int AS suspicious
-    FROM transactions WHERE timestamp >= NOW() - INTERVAL '7 days' GROUP BY 1 ORDER BY 1`);
+    FROM transactions WHERE timestamp >= $2::timestamptz AND timestamp < $3::timestamptz GROUP BY 1 ORDER BY 1`,
+  [chartRange.groupBy, chartRange.from, chartRange.endExclusive]);
   res.json({
     stats: { totalUsers: users.rows[0].total, activeUsers: users.rows[0].active, totalTransactions: txs.rows[0].total,
       totalVolume: Number(txs.rows[0].volume), suspiciousTransactions: txs.rows[0].suspicious,

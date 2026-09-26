@@ -274,6 +274,9 @@ tr:hover td { background:rgba(255,255,255,0.02); }
 .monthly-legend { display:flex; gap:16px; margin-top:12px; color:var(--text3); font:11px var(--mono); }
 .overview-chart-card { align-self:stretch; height:auto; display:flex; flex-direction:column; }
 .overview-chart-card .chart-bars { align-items:flex-end; }
+.admin-chart-filters { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:8px; width:100%; margin-bottom:12px; }
+.admin-chart-filters select, .admin-chart-filters input { min-width:0; padding:8px 10px; background:var(--bg2); border:1px solid var(--border); border-radius:6px; color:var(--text); font-size:12px; }
+.admin-chart-filters .is-hidden { display:none; }
 
 /* Profile info grid */
 .info-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; }
@@ -575,7 +578,29 @@ tr:hover td { background:rgba(255,255,255,0.02); }
     <div class="stats-grid" id="admin-stats"></div>
     <div class="grid-2">
       <div class="card overview-chart-card">
-        <div class="card-header"><h3>Transaction Volume (7 days)</h3></div>
+        <div class="card-header"><h3 id="admin-chart-title">Transaction Volume (Last 7 Days)</h3></div>
+        <div class="admin-chart-filters">
+          <select id="admin-chart-period" aria-label="Choose chart period" onchange="applyAdminChartPeriod()">
+            <option value="last7" selected>Last 7 days</option>
+            <option value="today">Today</option>
+            <option value="thisWeek">This week</option>
+            <option value="thisMonth">This month</option>
+            <option value="thisYear">This year</option>
+            <option value="specificDate">Specific date</option>
+            <option value="specificMonth">Specific month</option>
+            <option value="custom">Custom date range</option>
+          </select>
+          <select id="admin-chart-group" aria-label="Group chart by" onchange="loadAdminOverview()">
+            <option value="day" selected>Group by day</option>
+            <option value="week">Group by week</option>
+            <option value="month">Group by month</option>
+            <option value="year">Group by year</option>
+          </select>
+          <input class="is-hidden" id="admin-chart-date" type="date" aria-label="Select specific date" onchange="loadAdminOverview()">
+          <input class="is-hidden" id="admin-chart-month" type="month" aria-label="Select specific month" onchange="applyAdminChartPeriod()">
+          <input class="is-hidden" id="admin-chart-from" type="date" aria-label="Range start date" onchange="loadAdminOverview()">
+          <input class="is-hidden" id="admin-chart-to" type="date" aria-label="Range end date" onchange="loadAdminOverview()">
+        </div>
         <div class="chart-bars" id="admin-chart"></div>
         <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;font-family:var(--mono)">
           <span><span style="color:var(--primary)">■</span> Normal</span>
@@ -1401,12 +1426,116 @@ async function loadNotifications() {
 }
 
 // ─────────────────── ADMIN OVERVIEW ───────────────────────
+function adminChartDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function applyAdminChartPeriod() {
+  const period = document.getElementById('admin-chart-period');
+  if (!period) return;
+  const value = period.value;
+  const today = new Date();
+  document.getElementById('admin-chart-group').value = value === 'thisYear' ? 'month' : 'day';
+  const dateInput = document.getElementById('admin-chart-date');
+  const monthInput = document.getElementById('admin-chart-month');
+  const fromInput = document.getElementById('admin-chart-from');
+  const toInput = document.getElementById('admin-chart-to');
+  [dateInput, monthInput, fromInput, toInput].forEach(input => input.classList.add('is-hidden'));
+
+  let from = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let to = new Date(from);
+  if (value === 'last7') from.setDate(from.getDate() - 6);
+  if (value === 'thisWeek') {
+    from.setDate(from.getDate() - ((from.getDay() + 6) % 7));
+  }
+  if (value === 'thisMonth') from = new Date(today.getFullYear(), today.getMonth(), 1);
+  if (value === 'thisYear') {
+    from = new Date(today.getFullYear(), 0, 1);
+    document.getElementById('admin-chart-group').value = 'month';
+  }
+  if (value === 'specificDate') {
+    dateInput.classList.remove('is-hidden');
+    if (!dateInput.value) dateInput.value = adminChartDate(today);
+    from = new Date(`${dateInput.value}T00:00:00`);
+    to = new Date(from);
+  }
+  if (value === 'specificMonth') {
+    monthInput.classList.remove('is-hidden');
+    if (!monthInput.value) monthInput.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const [year, month] = monthInput.value.split('-').map(Number);
+    from = new Date(year, month - 1, 1);
+    to = new Date(year, month, 0);
+  }
+  if (value === 'custom') {
+    fromInput.classList.remove('is-hidden');
+    toInput.classList.remove('is-hidden');
+    if (!fromInput.value) {
+      const defaultFrom = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
+      fromInput.value = adminChartDate(defaultFrom);
+    }
+    if (!toInput.value) toInput.value = adminChartDate(today);
+    from = new Date(`${fromInput.value}T00:00:00`);
+    to = new Date(`${toInput.value}T00:00:00`);
+  }
+  if (value !== 'specificDate' && value !== 'specificMonth' && value !== 'custom') {
+    fromInput.value = adminChartDate(from);
+    toInput.value = adminChartDate(to);
+  }
+  loadAdminOverview();
+}
+
+function getAdminChartQuery() {
+  const period = document.getElementById('admin-chart-period')?.value || 'last7';
+  const groupBy = document.getElementById('admin-chart-group')?.value || 'day';
+  const date = document.getElementById('admin-chart-date')?.value;
+  const month = document.getElementById('admin-chart-month')?.value;
+  let from = document.getElementById('admin-chart-from')?.value;
+  let to = document.getElementById('admin-chart-to')?.value;
+  if (period === 'specificDate' && date) from = to = date;
+  if (period === 'specificMonth' && month) {
+    const [year, monthNumber] = month.split('-').map(Number);
+    from = `${year}-${String(monthNumber).padStart(2, '0')}-01`;
+    to = adminChartDate(new Date(year, monthNumber, 0));
+  }
+  const params = new URLSearchParams({ groupBy });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return params.toString();
+}
+
+function getAdminChartTitle() {
+  const period = document.getElementById('admin-chart-period')?.value;
+  if (period === 'specificDate') return document.getElementById('admin-chart-date')?.value || 'Selected Date';
+  if (period === 'specificMonth') return document.getElementById('admin-chart-month')?.value || 'Selected Month';
+  if (period === 'custom') {
+    const from = document.getElementById('admin-chart-from')?.value;
+    const to = document.getElementById('admin-chart-to')?.value;
+    if (from && to) return `${from} – ${to}`;
+  }
+  const labels = {
+    last7: 'Last 7 Days', today: 'Today', thisWeek: 'This Week', thisMonth: 'This Month',
+    thisYear: 'This Year', specificDate: 'Selected Date', specificMonth: 'Selected Month', custom: 'Custom Range'
+  };
+  return labels[period] || 'Last 7 Days';
+}
+
 async function loadAdminOverview() {
+  const period = document.getElementById('admin-chart-period')?.value;
+  const rangeStart = document.getElementById('admin-chart-from')?.value;
+  const rangeEnd = document.getElementById('admin-chart-to')?.value;
+  if (period === 'custom' && rangeStart && rangeEnd && rangeStart > rangeEnd) {
+    showToast('The start date must be before the end date', 'error');
+    return;
+  }
+  const chartQuery = getAdminChartQuery();
   let data = null;
   if (DEMO_MODE) {
     data = getMockOverview();
   } else {
-    data = await apiFetch('/admin/overview');
+    data = await apiFetch(`/admin/overview?${chartQuery}`);
     if (!data) { data = getMockOverview(); }
   }
   const s = data.stats;
@@ -1423,15 +1552,18 @@ async function loadAdminOverview() {
   `;
 
   // Chart
-  const chart = data.chartData;
+  const chart = data.chartData || [];
+  const title = document.getElementById('admin-chart-title');
+  if (title) title.textContent = `Transaction Volume (${getAdminChartTitle()})`;
+  const groupBy = document.getElementById('admin-chart-group')?.value || 'day';
   const maxVol = Math.max(...chart.map(d=>Math.max(Number(d.volume || 0) - Number(d.suspiciousVolume || 0), Number(d.suspiciousVolume || 0))), 1);
-  document.getElementById('admin-chart').innerHTML = chart.map(d=>`
+  document.getElementById('admin-chart').innerHTML = chart.length ? chart.map(d=>`
     <div class="chart-bar-wrap">
       <div class="chart-bar normal" data-tooltip="${d.date} · Confirmed/Normal: ₹${fmt(Number(d.volume || 0) - Number(d.suspiciousVolume || 0))}" style="height:${Math.max(4,((Number(d.volume || 0) - Number(d.suspiciousVolume || 0))/maxVol)*100)}px"></div>
       ${d.suspicious>0?`<div class="chart-bar suspicious" data-tooltip="${d.date} · Flagged/Suspicious: ₹${fmt(d.suspiciousVolume || 0)} (${d.suspicious} transaction(s))" style="height:${Math.max(4,(Number(d.suspiciousVolume || 0)/maxVol)*100)}px"></div>`:''}
-      <div class="chart-label">${d.date.slice(5)}</div>
+      <div class="chart-label">${groupBy === 'year' ? d.date.slice(0, 4) : groupBy === 'month' ? d.date.slice(0, 7) : groupBy === 'week' ? `Wk ${d.date.slice(5)}` : d.date.slice(5)}</div>
     </div>
-  `).join('');
+  `).join('') : '<div class="empty-state" style="width:100%"><p>No transactions in the selected period</p></div>';
 
   // Alerts preview
   const alerts = (data.recentAlerts || []).filter(a=>!a.resolved).slice(0,3);

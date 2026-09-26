@@ -321,8 +321,36 @@ router.use((req, res, next) => {
   return authenticateToken(req, res, () => requireAdmin(req, res, next));
 });
 
+function getOverviewChartRange(query) {
+  const today = new Date();
+  const todayUtc = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const toValue = query.to || todayUtc.toISOString().slice(0, 10);
+  const defaultFrom = new Date(todayUtc);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 6);
+  const fromValue = query.from || defaultFrom.toISOString().slice(0, 10);
+  const groupBy = ['day', 'week', 'month', 'year'].includes(query.groupBy) ? query.groupBy : 'day';
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const from = datePattern.test(fromValue) ? new Date(`${fromValue}T00:00:00.000Z`) : new Date(NaN);
+  const to = datePattern.test(toValue) ? new Date(`${toValue}T00:00:00.000Z`) : new Date(NaN);
+  if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return null;
+  return { from, to, groupBy };
+}
+
+function getChartBucketDate(date, groupBy) {
+  const bucket = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  if (groupBy === 'week') bucket.setUTCDate(bucket.getUTCDate() - ((bucket.getUTCDay() + 6) % 7));
+  if (groupBy === 'month') bucket.setUTCDate(1);
+  if (groupBy === 'year') {
+    bucket.setUTCMonth(0);
+    bucket.setUTCDate(1);
+  }
+  return bucket.toISOString().slice(0, 10);
+}
+
 // ─── GET /api/admin/overview ──────────────────────────────────────────────────
 router.get('/overview', (req, res) => {
+  const chartRange = getOverviewChartRange(req.query);
+  if (!chartRange) return res.status(400).json({ error: 'Invalid chart date range' });
   const users = db.get('users').value();
   const transactions = db.get('transactions').value();
   const alerts = db.get('alerts').value();
@@ -335,21 +363,24 @@ router.get('/overview', (req, res) => {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const recentTxs = transactions.filter(tx => new Date(tx.timestamp) >= thirtyDaysAgo);
 
-  // Transaction volume by day (last 7 days)
-  const last7Days = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    const dayTxs = transactions.filter(tx => tx.timestamp.startsWith(dateStr));
-    last7Days.push({
-      date: dateStr,
-      count: dayTxs.length,
-      volume: dayTxs.reduce((s, tx) => s + tx.amount, 0),
-      suspiciousVolume: dayTxs.filter(tx => tx.suspicious).reduce((s, tx) => s + tx.amount, 0),
-      suspicious: dayTxs.filter(tx => tx.suspicious).length
-    });
-  }
+  const chartBuckets = new Map();
+  const chartEnd = new Date(chartRange.to);
+  chartEnd.setUTCDate(chartEnd.getUTCDate() + 1);
+  transactions.forEach(tx => {
+    const timestamp = new Date(tx.timestamp);
+    if (timestamp < chartRange.from || timestamp >= chartEnd) return;
+    const date = getChartBucketDate(timestamp, chartRange.groupBy);
+    const bucket = chartBuckets.get(date) || { date, count: 0, volume: 0, suspiciousVolume: 0, suspicious: 0 };
+    const amount = Number(tx.amount || 0);
+    bucket.count += 1;
+    bucket.volume += amount;
+    if (tx.suspicious) {
+      bucket.suspicious += 1;
+      bucket.suspiciousVolume += amount;
+    }
+    chartBuckets.set(date, bucket);
+  });
+  const chartData = [...chartBuckets.values()].sort((a, b) => a.date.localeCompare(b.date));
 
   res.json({
     stats: {
@@ -364,7 +395,7 @@ router.get('/overview', (req, res) => {
       confirmedTxs: transactions.filter(tx => tx.status === 'confirmed').length,
       flaggedTxs: transactions.filter(tx => tx.status === 'flagged').length
     },
-    chartData: last7Days,
+    chartData,
     recentAlerts: alerts
       .filter(a => !a.resolved)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
